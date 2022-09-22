@@ -63,6 +63,31 @@ public class StepDefinitions{
         else assertFalse(new ReflectionEquals(createdUser).matches(currentUser));
     }
 
+    @When("fetch user with id {int}")
+    public void fetchUserWithId(int id) {
+        currentUser = getUserById(id);
+    }
+
+    @Then("fetching {int} should be {string}")
+    public void fetchingUserStatus(int id, String status) {
+        User fetchedUser = getUserById(id);
+        if(status.equals("valid")) {
+            assertTrue(new ReflectionEquals(fetchedUser).matches(currentUser));
+        }
+        else assertEquals(null, fetchedUser);
+    }
+
+    @Then("deleting {int} should be {string}")
+    public void deletingUserStatus(int id, String status) {
+        try{
+            userRepository.deleteById(id);
+            assertEquals("valid", status);
+        } catch (Exception e) {
+            System.out.println(e);
+            assertEquals("invalid", status);
+        }
+    }
+
     public User getUserById(int id) {
         User user = null;
         try{

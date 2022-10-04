@@ -1,14 +1,11 @@
 package com.example.testcasegenerator.cucumber;
 
-import com.example.testcasegenerator.model.User;
-import com.example.testcasegenerator.repository.UserRepository;
-import io.cucumber.java.en.Given;
-import io.cucumber.java.en.Then;
-import io.cucumber.java.en.When;
+import io.cucumber.java.en.*;
 import org.mockito.internal.matchers.apachecommons.ReflectionEquals;
 import org.springframework.beans.factory.annotation.Autowired;
-
 import static org.junit.Assert.*;
+import com.example.testcasegenerator.model.User;
+import com.example.testcasegenerator.repository.UserRepository;
 
 public class StepDefinitions{
     @Autowired
@@ -37,7 +34,7 @@ public class StepDefinitions{
             userRepository.save(currentUser);
             System.out.println("Saved user with id: " + currentUser.getId());
         } catch (Exception e) {
-            System.out.println(e);
+            e.printStackTrace();
         }
     }
 
@@ -74,7 +71,7 @@ public class StepDefinitions{
         if(status.equals("valid")) {
             assertTrue(new ReflectionEquals(fetchedUser).matches(currentUser));
         }
-        else assertEquals(null, fetchedUser);
+        else assertNull(fetchedUser);
     }
 
     @Then("deleting {int} should be {string}")
@@ -83,19 +80,15 @@ public class StepDefinitions{
             userRepository.deleteById(id);
             assertEquals("valid", status);
         } catch (Exception e) {
-            System.out.println(e);
+            e.printStackTrace();
             assertEquals("invalid", status);
         }
     }
 
-    public User getUserById(int id) {
-        User user = null;
-        try{
-            user = userRepository.findById(id).get();
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-        return user;
+    private User getUserById(int id) {
+        if(userRepository.findById(id).isPresent())
+            return userRepository.findById(id).get();
+        else return null;
     }
 
 }

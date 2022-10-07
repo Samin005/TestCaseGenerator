@@ -29,17 +29,16 @@ public class TestCaseGenerator {
                     System.out.println("Model name: " + modelName + "\n");
                     String classPath = modelsList[i].getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
                     Field[] fields = Class.forName(classPath).getConstructor().newInstance().getClass().getDeclaredFields();
-                    createFeatureFile(modelName, fields);
-                    // find model repository
-                    String modelRepositoryName = findModelRepository(modelName, repositoriesList);
-                    Method[] methods = Class.forName(classPath).getConstructor().newInstance().getClass().getMethods();
-                    System.out.println(Arrays.toString(methods));
-                    createStepDefinitionsFile(classPath, modelName, modelRepositoryName, fields, methods);
                     for(Field field: fields) {
                         System.out.println("Field Name: " + field.getName());
                         System.out.println("Field Type: " + field.getType());
                         System.out.println("Field Annotations: " + Arrays.toString(field.getAnnotations()) + "\n");
                     }
+                    createFeatureFile(modelName, fields);
+                    // find model repository
+                    String modelRepositoryName = findModelRepository(modelName, repositoriesList);
+                    Method[] methods = Class.forName(classPath).getConstructor().newInstance().getClass().getMethods();
+                    createStepDefinitionsFile(classPath, modelName, modelRepositoryName, fields, methods);
                 }
             }
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | InvocationTargetException |
@@ -50,7 +49,7 @@ public class TestCaseGenerator {
         }
     }
 
-    public static File findFile(String path, String fName) {
+    private static File findFile(String path, String fName) {
         File f = new File(path);
         if (fName.equalsIgnoreCase(f.getName())) return f;
         if (f.isDirectory()) {
@@ -62,7 +61,7 @@ public class TestCaseGenerator {
         return null;
     }
 
-    public static void writeNullableInvalidCases(FileWriter fileWriter, Field[] fields, int notNullableCount) throws IOException {
+    private static void writeNullableInvalidCases(FileWriter fileWriter, Field[] fields, int notNullableCount) throws IOException {
         int lastNullAppliedIndex = -1;
         for(int i=0; i<notNullableCount; i++) {
             boolean nullAppliedForRow = false;
@@ -84,7 +83,7 @@ public class TestCaseGenerator {
         }
     }
 
-    public static void writeUniqueInvalidCases(FileWriter fileWriter, Field[] fields, int uniqueCount) throws IOException {
+    private static void writeUniqueInvalidCases(FileWriter fileWriter, Field[] fields, int uniqueCount) throws IOException {
         int idCounter = 2;
         for(int i=0; i<uniqueCount; i++) {
             for(Field field: fields) {
@@ -102,7 +101,7 @@ public class TestCaseGenerator {
         }
     }
 
-    public static String findModelRepository(String modelName, File[] repositoriesList) throws FileNotFoundException {
+    private static String findModelRepository(String modelName, File[] repositoriesList) throws FileNotFoundException {
         String modelRepositoryName = null;
         Scanner sc;
         for(File repository: repositoriesList) {
@@ -118,7 +117,7 @@ public class TestCaseGenerator {
         return modelRepositoryName;
     }
 
-    public static String findModelMethodName(Field field, Method[] methods, String startsWith) {
+    private static String findModelMethodName(Field field, Method[] methods, String startsWith) {
         String methodName = null;
         for(Method method: methods) {
             if(method.getName().toLowerCase().contains(startsWith+field.getName())) {
@@ -126,6 +125,29 @@ public class TestCaseGenerator {
             }
         }
         return methodName;
+    }
+
+    private static String findIdFieldName(Field[] fields) {
+        for(Field field: fields) {
+            if(Arrays.toString(field.getAnnotations()).contains("Id()")) {
+                return field.getName();
+            }
+        }
+        return null;
+    }
+
+    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String firstStatementStartsWith, String secondStatementStartsWith) throws IOException {
+        fileWriter.write("      "+firstStatementStartsWith+" "+ modelNameLowerCase+" properties are ");
+        for(Field field: fields) {
+            if(field.getType().toString().endsWith("Integer")) {
+                fileWriter.write("<" + field.getName() + "> ");
+            }
+            else if(field.getType().toString().endsWith("String")) {
+                fileWriter.write("\"<" + field.getName() + ">\" ");
+            }
+        }
+        fileWriter.write("\n");
+        fileWriter.write("      "+secondStatementStartsWith+" create current "+ modelNameLowerCase+"\n");
     }
 
     public static void createFeatureFile(String modelName, Field[] fields) throws IOException {
@@ -144,17 +166,7 @@ public class TestCaseGenerator {
         // create scenario
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      And "+ modelNameLowerCase+" properties are ");
-        for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer")) {
-                fileWriter.write("<" + field.getName() + "> ");
-            }
-            else if(field.getType().toString().endsWith("String")) {
-                fileWriter.write("\"<" + field.getName() + ">\" ");
-            }
-        }
-        fileWriter.write("\n");
-        fileWriter.write("      When create current "+ modelNameLowerCase+"\n");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "When");
         fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -186,17 +198,7 @@ public class TestCaseGenerator {
 
         // create scenario
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      Given "+ modelNameLowerCase+" properties are ");
-        for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer")) {
-                fileWriter.write("<" + field.getName() + "> ");
-            }
-            else if(field.getType().toString().endsWith("String")) {
-                fileWriter.write("\"<" + field.getName() + ">\" ");
-            }
-        }
-        fileWriter.write("\n");
-        fileWriter.write("      When create current "+ modelNameLowerCase+"\n");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "When");
         fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -221,6 +223,87 @@ public class TestCaseGenerator {
         writeUniqueInvalidCases(fileWriter, fields, uniqueCount);
         // invalid nullable cases
         writeNullableInvalidCases(fileWriter, fields, notNullableCount);
+        fileWriter.write("\n");
+
+        // create scenario
+        String idFieldName = findIdFieldName(fields);
+        fileWriter.write("  Scenario Outline: fetch "+modelNameLowerCase+" without creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        fileWriter.write("      When fetch "+modelNameLowerCase+" with id <"+idFieldName+">\n");
+        fileWriter.write("      Then fetching <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        fileWriter.write("| " + idFieldName + " ");
+        fileWriter.write("| status |\n         ");
+        // invalid cases
+        for(int i=1; i<3; i++){
+            fileWriter.write("| " + i + " ");
+            fileWriter.write("| invalid |\n         ");
+        }
+        fileWriter.write("\n");
+
+        // create scenario
+        fileWriter.write("  Scenario Outline: fetch "+modelNameLowerCase+" after creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
+        fileWriter.write("      When fetch "+modelNameLowerCase+" with id <"+idFieldName+">\n");
+        fileWriter.write("      Then fetching <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        for(Field field: fields)
+            fileWriter.write("| " + field.getName() + " ");
+        fileWriter.write("| status |\n         ");
+        // valid cases
+        for(int i=1; i<3; i++){
+            for(Field field: fields) {
+                if(field.getType().toString().endsWith("Integer")) {
+                    fileWriter.write("| " + i + " ");
+                }
+                else if(field.getType().toString().endsWith("String")) {
+                    fileWriter.write("| test"+i+" ");
+                }
+            }
+            fileWriter.write("| valid |\n         ");
+        }
+        fileWriter.write("\n");
+
+        // create scenario
+        fileWriter.write("  Scenario Outline: delete "+modelNameLowerCase+" without creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        fileWriter.write("      Then deleting <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        fileWriter.write("| " + idFieldName + " ");
+        fileWriter.write("| status |\n         ");
+        // invalid cases
+        for(int i=1; i<3; i++){
+            fileWriter.write("| " + i + " ");
+            fileWriter.write("| invalid |\n         ");
+        }
+        fileWriter.write("\n");
+
+        // create scenario
+        fileWriter.write("  Scenario Outline: delete "+modelNameLowerCase+" after creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
+        fileWriter.write("      Then deleting <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        for(Field field: fields)
+            fileWriter.write("| " + field.getName() + " ");
+        fileWriter.write("| status |\n         ");
+        // valid cases
+        for(int i=1; i<3; i++){
+            for(Field field: fields) {
+                if(field.getType().toString().endsWith("Integer")) {
+                    fileWriter.write("| " + i + " ");
+                }
+                else if(field.getType().toString().endsWith("String")) {
+                    fileWriter.write("| test"+i+" ");
+                }
+            }
+            fileWriter.write("| valid |\n         ");
+        }
         fileWriter.write("\n");
 
         fileWriter.flush();

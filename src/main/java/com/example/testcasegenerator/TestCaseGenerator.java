@@ -23,13 +23,13 @@ public class TestCaseGenerator {
             File repositoryFolder = findFile(System.getProperty("user.dir") + "/src", REPOSITORY_PACKAGE_NAME);
             File[] repositoriesList = repositoryFolder.listFiles();
 
-            for (int i = 0; i < modelsList.length; i++) {
-                if (modelsList[i].isFile() && modelsList[i].getName().endsWith(".java")) {
-                    String modelName = modelsList[i].getName().replace(".java", "");
+            for (File modelFile : modelsList) {
+                if (modelFile.isFile() && modelFile.getName().endsWith(".java")) {
+                    String modelName = modelFile.getName().replace(".java", "");
                     System.out.println("Model name: " + modelName + "\n");
-                    String classPath = modelsList[i].getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
+                    String classPath = modelFile.getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
                     Field[] fields = Class.forName(classPath).getConstructor().newInstance().getClass().getDeclaredFields();
-                    for(Field field: fields) {
+                    for (Field field : fields) {
                         System.out.println("Field Name: " + field.getName());
                         System.out.println("Field Type: " + field.getType());
                         System.out.println("Field Annotations: " + Arrays.toString(field.getAnnotations()) + "\n");
@@ -286,6 +286,132 @@ public class TestCaseGenerator {
         fileWriter.close();
     }
 
+    private static void writeStepDefinitionMethodDeleteExisting(FileWriter fileWriter, String modelName, String modelNameLowerCase, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @Given(\"delete existing "+modelNameLowerCase+"s\")\n");
+        fileWriter.write("  public void deleteExisting"+modelName+"s() {\n");
+        fileWriter.write("      "+repositoryObjectName+".deleteAll();\n");
+        fileWriter.write("      assertEquals(0, "+repositoryObjectName+".count());\n");
+        fileWriter.write("      System.out.println(\"Deleted all "+modelNameLowerCase+"s\");\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodSetModelProperties(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  @Given(\""+modelNameLowerCase+" properties are");
+        for(Field field: fields) {
+            if(field.getType().toString().endsWith("Integer")) {
+                fileWriter.write(" {int}");
+            }
+            else if(field.getType().toString().endsWith("String")) {
+                fileWriter.write(" {string}");
+            }
+        }
+        fileWriter.write("\")\n");
+        fileWriter.write("  public void set"+modelName+"Properties(");
+        for(int i=0; i<fields.length; i++) {
+            if(fields[i].getType().toString().endsWith("Integer")) {
+                fileWriter.write("int " + fields[i].getName());
+            }
+            else if(fields[i].getType().toString().endsWith("String")) {
+                fileWriter.write("String " + fields[i].getName());
+            }
+            if(i!=fields.length-1)
+                fileWriter.write(", ");
+        }
+        fileWriter.write(") {\n");
+        for(Field field: fields) {
+            for(Method method: methods) {
+                if(method.getName().toLowerCase().contains("set"+field.getName())) {
+                    if(field.getType().toString().endsWith("String"))
+                        fileWriter.write("      "+field.getName()+" = "+field.getName()+".equals(\"null\") ? null : "+field.getName()+";\n");
+                    fileWriter.write("      current"+modelName+"."+method.getName()+"("+field.getName()+");\n");
+                }
+            }
+        }
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodCreateCurrentModel(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @When(\"create current "+modelNameLowerCase+"\")\n");
+        fileWriter.write("  public void createCurrent"+modelName+"() {\n");
+        fileWriter.write("      try{\n");
+        fileWriter.write("          "+repositoryObjectName+".save(current"+modelName+");\n");
+        for(Field field: fields) {
+            if(Arrays.toString(field.getAnnotations()).contains("Id()")) {
+                fileWriter.write("          System.out.println(\"Saved "+modelNameLowerCase+" with id: \" + current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
+            }
+        }
+        fileWriter.write("      } catch (Exception e) {\n");
+        fileWriter.write("          e.printStackTrace();\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeMethodGetModelById(FileWriter fileWriter, String modelName, String repositoryObjectName) throws IOException{
+        fileWriter.write("  private "+modelName+" get"+modelName+"ById(int id) {\n");
+        fileWriter.write("      if("+repositoryObjectName+".findById(id).isPresent())\n");
+        fileWriter.write("          return "+repositoryObjectName+".findById(id).get();\n");
+        fileWriter.write("      else return null;\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodCheckSingleModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @Then(\"create single user status should be {string}\")\n");
+        fileWriter.write("  public void checkSingle"+modelName+"CreateStatus(String status) {\n");
+        for(Field field: fields) {
+            if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
+                fileWriter.write("      "+modelName+" created"+modelName+" = get"+modelName+"ById"+"(current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
+            }
+        }
+        fileWriter.write("      if(status.equals(\"valid\")) {\n");
+        fileWriter.write("          assertEquals(1, "+repositoryObjectName+".count());\n");
+        fileWriter.write("          assertTrue(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("      else {\n");
+        fileWriter.write("          assertNotEquals(1, "+repositoryObjectName+".count());\n");
+        fileWriter.write("          assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodCheckModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName) throws IOException {
+        fileWriter.write("  @Then(\"create user status should be {string}\")\n");
+        fileWriter.write("  public void check"+modelName+"CreateStatus(String status) {\n");
+        for(Field field: fields) {
+            if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
+                fileWriter.write("      "+modelName+" created"+modelName+" = get"+modelName+"ById"+"(current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
+            }
+        }
+        fileWriter.write("      if(status.equals(\"valid\")) {\n");
+        fileWriter.write("          assertTrue(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("      else assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodCheckFetchingModel(FileWriter fileWriter, String modelName) throws IOException {
+        fileWriter.write("  @Then(\"fetching {int} should be {string}\")\n");
+        fileWriter.write("  public void fetching"+modelName+"Status(int id, String status) {\n");
+        fileWriter.write("      "+modelName+" fetched"+modelName+" = get"+modelName+"ById(id);\n");
+        fileWriter.write("      if(status.equals(\"valid\")) {\n");
+        fileWriter.write("          assertTrue(new ReflectionEquals(fetched"+modelName+").matches(current"+modelName+"));\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("      else assertNull(fetched"+modelName+");\n");
+        fileWriter.write("  }\n\n");
+    }
+
+    private static void writeStepDefinitionMethodCheckDeletingModel(FileWriter fileWriter, String modelName, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @Then(\"deleting {int} should be {string}\")\n");
+        fileWriter.write("  public void deleting"+modelName+"Status(int id, String status) {\n");
+        fileWriter.write("      try{\n");
+        fileWriter.write("          "+repositoryObjectName+".deleteById(id);\n");
+        fileWriter.write("          assertEquals(\"valid\", status);\n");
+        fileWriter.write("      } catch (Exception e) {\n");
+        fileWriter.write("          e.printStackTrace();\n");
+        fileWriter.write("          assertEquals(\"invalid\", status);\n");
+        fileWriter.write("      }\n");
+        fileWriter.write("  }\n\n");
+    }
+
     public static void createStepDefinitionsFile(String classPath, String modelName, String modelRepositoryName, Field[] fields, Method[] methods) throws IOException {
         String commonClassPath  = classPath.replace("."+MODEL_PACKAGE_NAME+"."+modelName, "");
         String packageName = "cucumber";
@@ -318,122 +444,28 @@ public class TestCaseGenerator {
             String modelNameLowerCase = modelName.toLowerCase();
 
             // creating method
-            fileWriter.write("  @Given(\"delete existing "+modelNameLowerCase+"s\")\n");
-            fileWriter.write("  public void deleteExisting"+modelName+"s() {\n");
-            fileWriter.write("      "+repositoryObjectName+".deleteAll();\n");
-            fileWriter.write("      assertEquals(0, "+repositoryObjectName+".count());\n");
-            fileWriter.write("      System.out.println(\"Deleted all "+modelNameLowerCase+"s\");\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodDeleteExisting(fileWriter, modelName, modelNameLowerCase, repositoryObjectName);
 
             // creating method
-            fileWriter.write("  @Given(\""+modelNameLowerCase+" properties are");
-            for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
-                    fileWriter.write(" {int}");
-                }
-                else if(field.getType().toString().endsWith("String")) {
-                    fileWriter.write(" {string}");
-                }
-            }
-            fileWriter.write("\")\n");
-            fileWriter.write("  public void set"+modelName+"Properties(");
-            for(int i=0; i<fields.length; i++) {
-                if(fields[i].getType().toString().endsWith("Integer")) {
-                    fileWriter.write("int " + fields[i].getName());
-                }
-                else if(fields[i].getType().toString().endsWith("String")) {
-                    fileWriter.write("String " + fields[i].getName());
-                }
-                if(i!=fields.length-1)
-                    fileWriter.write(", ");
-            }
-            fileWriter.write(") {\n");
-            for(Field field: fields) {
-                for(Method method: methods) {
-                    if(method.getName().toLowerCase().contains("set"+field.getName())) {
-                        if(field.getType().toString().endsWith("String"))
-                            fileWriter.write("      "+field.getName()+" = "+field.getName()+".equals(\"null\") ? null : "+field.getName()+";\n");
-                        fileWriter.write("      current"+modelName+"."+method.getName()+"("+field.getName()+");\n");
-                    }
-                }
-            }
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodSetModelProperties(fileWriter, fields, methods, modelName, modelNameLowerCase);
 
             // creating method
-            fileWriter.write("  @When(\"create current "+modelNameLowerCase+"\")\n");
-            fileWriter.write("  public void createCurrent"+modelName+"() {\n");
-            fileWriter.write("      try{\n");
-            fileWriter.write("          "+repositoryObjectName+".save(current"+modelName+");\n");
-            for(Field field: fields) {
-                if(Arrays.toString(field.getAnnotations()).contains("Id()")) {
-                    fileWriter.write("          System.out.println(\"Saved "+modelNameLowerCase+" with id: \" + current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
-                }
-            }
-            fileWriter.write("      } catch (Exception e) {\n");
-            fileWriter.write("          e.printStackTrace();\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodCreateCurrentModel(fileWriter, fields, methods, modelName, modelNameLowerCase, repositoryObjectName);
 
             // creating method
-            fileWriter.write("  private "+modelName+" get"+modelName+"ById(int id) {\n");
-            fileWriter.write("      if("+repositoryObjectName+".findById(id).isPresent())\n");
-            fileWriter.write("          return "+repositoryObjectName+".findById(id).get();\n");
-            fileWriter.write("      else return null;\n");
-            fileWriter.write("  }\n\n");
+            writeMethodGetModelById(fileWriter, modelName, repositoryObjectName);
 
             // creating method
-            fileWriter.write("  @Then(\"create single user status should be {string}\")\n");
-            fileWriter.write("  public void checkSingle"+modelName+"CreateStatus(String status) {\n");
-            for(Field field: fields) {
-                if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
-                    fileWriter.write("      "+modelName+" created"+modelName+" = get"+modelName+"ById"+"(current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
-                }
-            }
-            fileWriter.write("      if(status.equals(\"valid\")) {\n");
-            fileWriter.write("          assertEquals(1, "+repositoryObjectName+".count());\n");
-            fileWriter.write("          assertTrue(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("      else {\n");
-            fileWriter.write("          assertNotEquals(1, "+repositoryObjectName+".count());\n");
-            fileWriter.write("          assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodCheckSingleModelCreation(fileWriter, fields, methods, modelName, repositoryObjectName);
 
             // creating method
-            fileWriter.write("  @Then(\"create user status should be {string}\")\n");
-            fileWriter.write("  public void check"+modelName+"CreateStatus(String status) {\n");
-            for(Field field: fields) {
-                if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
-                    fileWriter.write("      "+modelName+" created"+modelName+" = get"+modelName+"ById"+"(current"+modelName+"."+findModelMethodName(field, methods, "get")+"());\n");
-                }
-            }
-            fileWriter.write("      if(status.equals(\"valid\")) {\n");
-            fileWriter.write("          assertTrue(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("      else assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodCheckModelCreation(fileWriter, fields, methods, modelName);
 
             // creating method
-            fileWriter.write("  @Then(\"fetching {int} should be {string}\")\n");
-            fileWriter.write("  public void fetching"+modelName+"Status(int id, String status) {\n");
-            fileWriter.write("      "+modelName+" fetched"+modelName+" = get"+modelName+"ById(id);\n");
-            fileWriter.write("      if(status.equals(\"valid\")) {\n");
-            fileWriter.write("          assertTrue(new ReflectionEquals(fetched"+modelName+").matches(current"+modelName+"));\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("      else assertNull(fetched"+modelName+");\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodCheckFetchingModel(fileWriter, modelName);
 
             // creating method
-            fileWriter.write("  @Then(\"deleting {int} should be {string}\")\n");
-            fileWriter.write("  public void deleting"+modelName+"Status(int id, String status) {\n");
-            fileWriter.write("      try{\n");
-            fileWriter.write("          "+repositoryObjectName+".deleteById(id);\n");
-            fileWriter.write("          assertEquals(\"valid\", status);\n");
-            fileWriter.write("      } catch (Exception e) {\n");
-            fileWriter.write("          e.printStackTrace();\n");
-            fileWriter.write("          assertEquals(\"invalid\", status);\n");
-            fileWriter.write("      }\n");
-            fileWriter.write("  }\n\n");
+            writeStepDefinitionMethodCheckDeletingModel(fileWriter, modelName, repositoryObjectName);
 
             fileWriter.write("}");
         }

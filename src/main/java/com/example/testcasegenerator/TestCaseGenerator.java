@@ -150,37 +150,29 @@ public class TestCaseGenerator {
         fileWriter.write("      "+secondStatementStartsWith+" create current "+ modelNameLowerCase+"\n");
     }
 
-    public static void createFeatureFile(String modelName, Field[] fields) throws IOException {
-        // create directory if it does not exist
-        File directory = new File("src/test/resources");
-        directory.mkdir();
+    private static void writeValidExampleRowsWithAllFields(int count, FileWriter fileWriter, Field[] fields) throws IOException {
+        for(int i=1; i<=count; i++){
+            for(Field field: fields) {
+                if(field.getType().toString().endsWith("Integer")) {
+                    fileWriter.write("| " + i + " ");
+                }
+                else if(field.getType().toString().endsWith("String")) {
+                    fileWriter.write("| test"+i+" ");
+                }
+            }
+            fileWriter.write("| valid |\n         ");
+        }
+    }
 
-        // create empty feature file
-        File featureFile = new File(directory, modelName + ".feature");
-        featureFile.createNewFile();
-
-        FileWriter fileWriter = new FileWriter(featureFile);
-        fileWriter.write("Feature: " + modelName + "\n\n");
-        String modelNameLowerCase = modelName.toLowerCase();
-
-        // create scenario
+    private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount) throws IOException {
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "When");
         fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        int notNullableCount = 0;
-        int uniqueCount = 0;
-        for(Field field: fields) {
+        for(Field field: fields)
             fileWriter.write("| " + field.getName() + " ");
-            if(!Arrays.toString(field.getAnnotations()).contains("Id()")) {
-                if(Arrays.toString(field.getAnnotations()).contains("nullable=false"))
-                    notNullableCount++;
-                if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
-                    uniqueCount++;
-            }
-        }
         fileWriter.write("| status |\n         ");
         // valid case
         for(Field field: fields) {
@@ -195,8 +187,9 @@ public class TestCaseGenerator {
         // invalid nullable cases
         writeNullableInvalidCases(fileWriter, fields, notNullableCount);
         fileWriter.write("\n");
+    }
 
-        // create scenario
+    private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "When");
         fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\"\n");
@@ -206,105 +199,92 @@ public class TestCaseGenerator {
             fileWriter.write("| " + field.getName() + " ");
         fileWriter.write("| status |\n         ");
         // valid case
-        int idCounter = 1;
-        for(int i=0; i<2; i++){
-            for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
-                    fileWriter.write("| " + idCounter + " ");
-                }
-                else if(field.getType().toString().endsWith("String")) {
-                    fileWriter.write("| test"+idCounter+" ");
-                }
-            }
-            fileWriter.write("| valid |\n         ");
-            idCounter++;
-        }
+        writeValidExampleRowsWithAllFields(2, fileWriter, fields);
+
         // invalid unique cases
         writeUniqueInvalidCases(fileWriter, fields, uniqueCount);
         // invalid nullable cases
         writeNullableInvalidCases(fileWriter, fields, notNullableCount);
         fileWriter.write("\n");
+    }
 
-        // create scenario
+    private static void writeTestScenarioFetchOrDeleteBeforeModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" without creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        if(command.equals("fetch") && commanding.equals("fetching"))
+            fileWriter.write("      When "+command+" "+modelNameLowerCase+" with id <"+idFieldName+">\n");
+        fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        fileWriter.write("| " + idFieldName + " ");
+        fileWriter.write("| status |\n         ");
+        // invalid cases
+        for(int i=1; i<3; i++){
+            fileWriter.write("| " + i + " ");
+            fileWriter.write("| invalid |\n         ");
+        }
+        fileWriter.write("\n");
+    }
+
+    private static void writeTestScenarioFetchOrDeleteAfterModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, Field[] fields, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
+        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
+        if(command.equals("fetch") && commanding.equals("fetching"))
+            fileWriter.write("      When "+command+" "+modelNameLowerCase+" with id <"+idFieldName+">\n");
+        fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Examples:\n         ");
+        // create example table
+        for(Field field: fields)
+            fileWriter.write("| " + field.getName() + " ");
+        fileWriter.write("| status |\n         ");
+        // valid cases
+        writeValidExampleRowsWithAllFields(2, fileWriter, fields);
+        fileWriter.write("\n");
+    }
+
+    public static void createFeatureFile(String modelName, Field[] fields) throws IOException {
+        // create directory if it does not exist
+        File directory = new File("src/test/resources");
+        directory.mkdir();
+
+        // create empty feature file
+        File featureFile = new File(directory, modelName + ".feature");
+        featureFile.createNewFile();
+
+        FileWriter fileWriter = new FileWriter(featureFile);
+        fileWriter.write("Feature: " + modelName + "\n\n");
+        String modelNameLowerCase = modelName.toLowerCase();
+
         String idFieldName = findIdFieldName(fields);
-        fileWriter.write("  Scenario Outline: fetch "+modelNameLowerCase+" without creation\n");
-        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      When fetch "+modelNameLowerCase+" with id <"+idFieldName+">\n");
-        fileWriter.write("      Then fetching <"+idFieldName+"> should be \"<status>\"\n");
-        fileWriter.write("      Examples:\n         ");
-        // create example table
-        fileWriter.write("| " + idFieldName + " ");
-        fileWriter.write("| status |\n         ");
-        // invalid cases
-        for(int i=1; i<3; i++){
-            fileWriter.write("| " + i + " ");
-            fileWriter.write("| invalid |\n         ");
-        }
-        fileWriter.write("\n");
-
-        // create scenario
-        fileWriter.write("  Scenario Outline: fetch "+modelNameLowerCase+" after creation\n");
-        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
-        fileWriter.write("      When fetch "+modelNameLowerCase+" with id <"+idFieldName+">\n");
-        fileWriter.write("      Then fetching <"+idFieldName+"> should be \"<status>\"\n");
-        fileWriter.write("      Examples:\n         ");
-        // create example table
-        for(Field field: fields)
-            fileWriter.write("| " + field.getName() + " ");
-        fileWriter.write("| status |\n         ");
-        // valid cases
-        for(int i=1; i<3; i++){
-            for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
-                    fileWriter.write("| " + i + " ");
-                }
-                else if(field.getType().toString().endsWith("String")) {
-                    fileWriter.write("| test"+i+" ");
-                }
+        int notNullableCount = 0;
+        int uniqueCount = 0;
+        for(Field field: fields) {
+            if(!Arrays.toString(field.getAnnotations()).contains("Id()")) {
+                if(Arrays.toString(field.getAnnotations()).contains("nullable=false"))
+                    notNullableCount++;
+                if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
+                    uniqueCount++;
             }
-            fileWriter.write("| valid |\n         ");
         }
-        fileWriter.write("\n");
 
         // create scenario
-        fileWriter.write("  Scenario Outline: delete "+modelNameLowerCase+" without creation\n");
-        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      Then deleting <"+idFieldName+"> should be \"<status>\"\n");
-        fileWriter.write("      Examples:\n         ");
-        // create example table
-        fileWriter.write("| " + idFieldName + " ");
-        fileWriter.write("| status |\n         ");
-        // invalid cases
-        for(int i=1; i<3; i++){
-            fileWriter.write("| " + i + " ");
-            fileWriter.write("| invalid |\n         ");
-        }
-        fileWriter.write("\n");
+        writeTestScenarioCreateSingleModel(fileWriter, fields, modelNameLowerCase, notNullableCount);
 
         // create scenario
-        fileWriter.write("  Scenario Outline: delete "+modelNameLowerCase+" after creation\n");
-        fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
-        fileWriter.write("      Then deleting <"+idFieldName+"> should be \"<status>\"\n");
-        fileWriter.write("      Examples:\n         ");
-        // create example table
-        for(Field field: fields)
-            fileWriter.write("| " + field.getName() + " ");
-        fileWriter.write("| status |\n         ");
-        // valid cases
-        for(int i=1; i<3; i++){
-            for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
-                    fileWriter.write("| " + i + " ");
-                }
-                else if(field.getType().toString().endsWith("String")) {
-                    fileWriter.write("| test"+i+" ");
-                }
-            }
-            fileWriter.write("| valid |\n         ");
-        }
-        fileWriter.write("\n");
+        writeTestScenarioCreateMultipleModel(fileWriter, fields, modelNameLowerCase, notNullableCount, uniqueCount);
+
+        // create scenario
+        writeTestScenarioFetchOrDeleteBeforeModelCreation("fetch", "fetching", idFieldName, fileWriter, modelNameLowerCase);
+
+        // create scenario
+        writeTestScenarioFetchOrDeleteAfterModelCreation("fetch", "fetching", idFieldName, fileWriter, fields, modelNameLowerCase);
+
+        // create scenario
+        writeTestScenarioFetchOrDeleteBeforeModelCreation("delete", "deleting", idFieldName, fileWriter, modelNameLowerCase);
+
+        // create scenario
+        writeTestScenarioFetchOrDeleteAfterModelCreation("delete", "deleting", idFieldName, fileWriter, fields, modelNameLowerCase);
 
         fileWriter.flush();
         fileWriter.close();

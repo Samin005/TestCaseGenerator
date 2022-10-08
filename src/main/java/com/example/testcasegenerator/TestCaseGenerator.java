@@ -211,8 +211,6 @@ public class TestCaseGenerator {
     private static void writeTestScenarioFetchOrDeleteBeforeModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" without creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        if(command.equals("fetch") && commanding.equals("fetching"))
-            fileWriter.write("      When "+command+" "+modelNameLowerCase+" with id <"+idFieldName+">\n");
         fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -230,8 +228,6 @@ public class TestCaseGenerator {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
-        if(command.equals("fetch") && commanding.equals("fetching"))
-            fileWriter.write("      When "+command+" "+modelNameLowerCase+" with id <"+idFieldName+">\n");
         fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -320,6 +316,7 @@ public class TestCaseGenerator {
             fileWriter.write("  private "+modelRepositoryName+" "+repositoryObjectName+";\n");
             fileWriter.write("  private "+modelName+" current"+modelName+" = new "+modelName+"();\n\n");
             String modelNameLowerCase = modelName.toLowerCase();
+
             // creating method
             fileWriter.write("  @Given(\"delete existing "+modelNameLowerCase+"s\")\n");
             fileWriter.write("  public void deleteExisting"+modelName+"s() {\n");
@@ -327,6 +324,7 @@ public class TestCaseGenerator {
             fileWriter.write("      assertEquals(0, "+repositoryObjectName+".count());\n");
             fileWriter.write("      System.out.println(\"Deleted all "+modelNameLowerCase+"s\");\n");
             fileWriter.write("  }\n\n");
+
             // creating method
             fileWriter.write("  @Given(\""+modelNameLowerCase+" properties are");
             for(Field field: fields) {
@@ -360,6 +358,7 @@ public class TestCaseGenerator {
                 }
             }
             fileWriter.write("  }\n\n");
+
             // creating method
             fileWriter.write("  @When(\"create current "+modelNameLowerCase+"\")\n");
             fileWriter.write("  public void createCurrent"+modelName+"() {\n");
@@ -374,12 +373,14 @@ public class TestCaseGenerator {
             fileWriter.write("          e.printStackTrace();\n");
             fileWriter.write("      }\n");
             fileWriter.write("  }\n\n");
+
             // creating method
             fileWriter.write("  private "+modelName+" get"+modelName+"ById(int id) {\n");
             fileWriter.write("      if("+repositoryObjectName+".findById(id).isPresent())\n");
             fileWriter.write("          return "+repositoryObjectName+".findById(id).get();\n");
             fileWriter.write("      else return null;\n");
             fileWriter.write("  }\n\n");
+
             // creating method
             fileWriter.write("  @Then(\"create single user status should be {string}\")\n");
             fileWriter.write("  public void checkSingle"+modelName+"CreateStatus(String status) {\n");
@@ -397,6 +398,7 @@ public class TestCaseGenerator {
             fileWriter.write("          assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
             fileWriter.write("      }\n");
             fileWriter.write("  }\n\n");
+
             // creating method
             fileWriter.write("  @Then(\"create user status should be {string}\")\n");
             fileWriter.write("  public void check"+modelName+"CreateStatus(String status) {\n");
@@ -408,10 +410,31 @@ public class TestCaseGenerator {
             fileWriter.write("      if(status.equals(\"valid\")) {\n");
             fileWriter.write("          assertTrue(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
             fileWriter.write("      }\n");
-            fileWriter.write("      else {\n");
-            fileWriter.write("          assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+            fileWriter.write("      else assertFalse(new ReflectionEquals(created"+modelName+").matches(current"+modelName+"));\n");
+            fileWriter.write("  }\n\n");
+
+            // creating method
+            fileWriter.write("  @Then(\"fetching {int} should be {string}\")\n");
+            fileWriter.write("  public void fetching"+modelName+"Status(int id, String status) {\n");
+            fileWriter.write("      "+modelName+" fetched"+modelName+" = get"+modelName+"ById(id);\n");
+            fileWriter.write("      if(status.equals(\"valid\")) {\n");
+            fileWriter.write("          assertTrue(new ReflectionEquals(fetched"+modelName+").matches(current"+modelName+"));\n");
+            fileWriter.write("      }\n");
+            fileWriter.write("      else assertNull(fetched"+modelName+");\n");
+            fileWriter.write("  }\n\n");
+
+            // creating method
+            fileWriter.write("  @Then(\"deleting {int} should be {string}\")\n");
+            fileWriter.write("  public void deleting"+modelName+"Status(int id, String status) {\n");
+            fileWriter.write("      try{\n");
+            fileWriter.write("          "+repositoryObjectName+".deleteById(id);\n");
+            fileWriter.write("          assertEquals(\"valid\", status);\n");
+            fileWriter.write("      } catch (Exception e) {\n");
+            fileWriter.write("          e.printStackTrace();\n");
+            fileWriter.write("          assertEquals(\"invalid\", status);\n");
             fileWriter.write("      }\n");
             fileWriter.write("  }\n\n");
+
             fileWriter.write("}");
         }
         else

@@ -60,10 +60,10 @@ public class StepDefinitions{
         else assertFalse(new ReflectionEquals(createdUser).matches(currentUser));
     }
 
-    @When("fetch user with id {int}")
-    public void fetchUserWithId(int id) {
-        currentUser = getUserById(id);
-    }
+//    @When("fetch user with id {int}")
+//    public void fetchUserWithId(int id) {
+//        currentUser = getUserById(id);
+//    }
 
     @Then("fetching {int} should be {string}")
     public void fetchingUserStatus(int id, String status) {

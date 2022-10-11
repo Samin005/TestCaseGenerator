@@ -211,7 +211,7 @@ public class TestCaseGenerator {
     private static void writeTestScenarioFetchOrDeleteBeforeModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" without creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         fileWriter.write("| " + idFieldName + " ");
@@ -228,7 +228,7 @@ public class TestCaseGenerator {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
-        fileWriter.write("      Then "+commanding+" <"+idFieldName+"> should be \"<status>\"\n");
+        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         for(Field field: fields)
@@ -354,8 +354,8 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodCheckSingleModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String repositoryObjectName) throws IOException {
-        fileWriter.write("  @Then(\"create single user status should be {string}\")\n");
+    private static void writeStepDefinitionMethodCheckSingleModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @Then(\"create single "+modelNameLowerCase+" status should be {string}\")\n");
         fileWriter.write("  public void checkSingle"+modelName+"CreateStatus(String status) {\n");
         for(Field field: fields) {
             if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
@@ -373,8 +373,8 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodCheckModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName) throws IOException {
-        fileWriter.write("  @Then(\"create user status should be {string}\")\n");
+    private static void writeStepDefinitionMethodCheckModelCreation(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  @Then(\"create "+modelNameLowerCase+" status should be {string}\")\n");
         fileWriter.write("  public void check"+modelName+"CreateStatus(String status) {\n");
         for(Field field: fields) {
             if (Arrays.toString(field.getAnnotations()).contains("Id()")) {
@@ -388,8 +388,8 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodCheckFetchingModel(FileWriter fileWriter, String modelName) throws IOException {
-        fileWriter.write("  @Then(\"fetching {int} should be {string}\")\n");
+    private static void writeStepDefinitionMethodCheckFetchingModel(FileWriter fileWriter, String modelName, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  @Then(\"fetching "+modelNameLowerCase+" {int} should be {string}\")\n");
         fileWriter.write("  public void fetching"+modelName+"Status(int id, String status) {\n");
         fileWriter.write("      "+modelName+" fetched"+modelName+" = get"+modelName+"ById(id);\n");
         fileWriter.write("      if(status.equals(\"valid\")) {\n");
@@ -399,8 +399,8 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodCheckDeletingModel(FileWriter fileWriter, String modelName, String repositoryObjectName) throws IOException {
-        fileWriter.write("  @Then(\"deleting {int} should be {string}\")\n");
+    private static void writeStepDefinitionMethodCheckDeletingModel(FileWriter fileWriter, String modelName, String modelNameLowerCase, String repositoryObjectName) throws IOException {
+        fileWriter.write("  @Then(\"deleting "+modelNameLowerCase+" {int} should be {string}\")\n");
         fileWriter.write("  public void deleting"+modelName+"Status(int id, String status) {\n");
         fileWriter.write("      try{\n");
         fileWriter.write("          "+repositoryObjectName+".deleteById(id);\n");
@@ -456,16 +456,16 @@ public class TestCaseGenerator {
             writeMethodGetModelById(fileWriter, modelName, repositoryObjectName);
 
             // creating method
-            writeStepDefinitionMethodCheckSingleModelCreation(fileWriter, fields, methods, modelName, repositoryObjectName);
+            writeStepDefinitionMethodCheckSingleModelCreation(fileWriter, fields, methods, modelName, modelNameLowerCase, repositoryObjectName);
 
             // creating method
-            writeStepDefinitionMethodCheckModelCreation(fileWriter, fields, methods, modelName);
+            writeStepDefinitionMethodCheckModelCreation(fileWriter, fields, methods, modelName, modelNameLowerCase);
 
             // creating method
-            writeStepDefinitionMethodCheckFetchingModel(fileWriter, modelName);
+            writeStepDefinitionMethodCheckFetchingModel(fileWriter, modelName, modelNameLowerCase);
 
             // creating method
-            writeStepDefinitionMethodCheckDeletingModel(fileWriter, modelName, repositoryObjectName);
+            writeStepDefinitionMethodCheckDeletingModel(fileWriter, modelName, modelNameLowerCase, repositoryObjectName);
 
             fileWriter.write("}");
         }

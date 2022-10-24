@@ -19,7 +19,7 @@ public class ManualLoanStepDefinitions {
       System.out.println("Deleted all loans");
   }
 
-  @Given("loan properties are {int} {int} {int}")
+  @Given("create loan with values {int} {int} {int}")
   public void setLoanProperties(int id, int user_id, int item_id) {
       currentLoan.setId(id);
       if(user_id != -1) {
@@ -32,10 +32,6 @@ public class ManualLoanStepDefinitions {
           item.setId(item_id);
           currentLoan.setItem(item);
       }
-  }
-
-  @When("create current loan")
-  public void createCurrentLoan() {
       try{
           loanRepository.save(currentLoan);
           System.out.println("Saved loan with id: " + currentLoan.getId());

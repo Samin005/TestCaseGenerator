@@ -136,8 +136,8 @@ public class TestCaseGenerator {
         return null;
     }
 
-    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String firstStatementStartsWith, String secondStatementStartsWith) throws IOException {
-        fileWriter.write("      "+firstStatementStartsWith+" "+ modelNameLowerCase+" properties are ");
+    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String command) throws IOException {
+        fileWriter.write("      "+command+" create "+ modelNameLowerCase+" with values ");
         for(Field field: fields) {
             if(field.getType().toString().endsWith("Integer")) {
                 fileWriter.write("<" + field.getName() + "> ");
@@ -147,7 +147,6 @@ public class TestCaseGenerator {
             }
         }
         fileWriter.write("\n");
-        fileWriter.write("      "+secondStatementStartsWith+" create current "+ modelNameLowerCase+"\n");
     }
 
     private static void writeValidExampleRowsWithAllFields(int count, FileWriter fileWriter, Field[] fields) throws IOException {
@@ -167,7 +166,7 @@ public class TestCaseGenerator {
     private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount) throws IOException {
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "When");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "When");
         fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -191,7 +190,7 @@ public class TestCaseGenerator {
 
     private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "When");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given");
         fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -227,7 +226,7 @@ public class TestCaseGenerator {
     private static void writeTestScenarioFetchOrDeleteAfterModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, Field[] fields, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "And");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And");
         fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
@@ -295,10 +294,10 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodSetModelProperties(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase) throws IOException {
-        fileWriter.write("  @Given(\""+modelNameLowerCase+" properties are");
+    private static void writeStepDefinitionMethodCreateModelWithValues(FileWriter fileWriter, Field[] fields, Method[] methods, String repositoryObjectName, String modelName, String modelNameLowerCase) throws IOException {
+        fileWriter.write("  @Given(\"create "+modelNameLowerCase+" with values");
         for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer")) {
+            if(field.getType().toString().endsWith("Integer") || field.getType().toString().contains(MODEL_PACKAGE_NAME + ".")) {
                 fileWriter.write(" {int}");
             }
             else if(field.getType().toString().endsWith("String")) {
@@ -308,7 +307,7 @@ public class TestCaseGenerator {
         fileWriter.write("\")\n");
         fileWriter.write("  public void set"+modelName+"Properties(");
         for(int i=0; i<fields.length; i++) {
-            if(fields[i].getType().toString().endsWith("Integer")) {
+            if(fields[i].getType().toString().endsWith("Integer") || fields[i].getType().toString().contains(MODEL_PACKAGE_NAME + ".")) {
                 fileWriter.write("int " + fields[i].getName());
             }
             else if(fields[i].getType().toString().endsWith("String")) {
@@ -327,12 +326,6 @@ public class TestCaseGenerator {
                 }
             }
         }
-        fileWriter.write("  }\n\n");
-    }
-
-    private static void writeStepDefinitionMethodCreateCurrentModel(FileWriter fileWriter, Field[] fields, Method[] methods, String modelName, String modelNameLowerCase, String repositoryObjectName) throws IOException {
-        fileWriter.write("  @When(\"create current "+modelNameLowerCase+"\")\n");
-        fileWriter.write("  public void createCurrent"+modelName+"() {\n");
         fileWriter.write("      try{\n");
         fileWriter.write("          "+repositoryObjectName+".save(current"+modelName+");\n");
         for(Field field: fields) {
@@ -447,10 +440,7 @@ public class TestCaseGenerator {
             writeStepDefinitionMethodDeleteExisting(fileWriter, modelName, modelNameLowerCase, repositoryObjectName);
 
             // creating method
-            writeStepDefinitionMethodSetModelProperties(fileWriter, fields, methods, modelName, modelNameLowerCase);
-
-            // creating method
-            writeStepDefinitionMethodCreateCurrentModel(fileWriter, fields, methods, modelName, modelNameLowerCase, repositoryObjectName);
+            writeStepDefinitionMethodCreateModelWithValues(fileWriter, fields, methods, repositoryObjectName, modelName, modelNameLowerCase);
 
             // creating method
             writeMethodGetModelById(fileWriter, modelName, repositoryObjectName);

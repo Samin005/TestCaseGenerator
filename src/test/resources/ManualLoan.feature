@@ -1,15 +1,12 @@
 Feature: Loan
 
   Background:
-    Given user properties are 1 "test-name" "test-email"
-    And create current user
-    And item properties are 1 1
-    And create current item
+    Given create user with values 1 "test-name" "test-email"
+    And create item with values 1 1
 
   Scenario Outline: create single loan
       Given delete existing loans
-      And loan properties are <id> <user_id> <item_id>
-      When create current loan
+      And create loan with values <id> <user_id> <item_id>
       Then create single loan status should be "<status>"
       Examples:
          | id | user_id | item_id | status |
@@ -18,8 +15,7 @@ Feature: Loan
          | 1 | 1 | -1 | invalid |
          
   Scenario Outline: create multiple loans
-      Given loan properties are <id> <user_id> <item_id>
-      When create current loan
+      Given create loan with values <id> <user_id> <item_id>
       Then create loan status should be "<status>"
       Examples:
          | id | user_id | item_id | status |
@@ -38,8 +34,7 @@ Feature: Loan
          
   Scenario Outline: fetch loan after creation
       Given delete existing loans
-      And loan properties are <id> <user_id> <item_id>
-      And create current loan
+      And create loan with values <id> <user_id> <item_id>
       Then fetching loan <id> should be "<status>"
       Examples:
          | id | user_id | item_id | status |
@@ -56,8 +51,7 @@ Feature: Loan
          
   Scenario Outline: delete loan after creation
       Given delete existing loans
-      And loan properties are <id> <user_id> <item_id>
-      And create current loan
+      And create loan with values <id> <user_id> <item_id>
       Then deleting loan <id> should be "<status>"
       Examples:
          | id | user_id | item_id | status |

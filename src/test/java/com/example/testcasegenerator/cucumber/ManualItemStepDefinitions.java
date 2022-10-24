@@ -20,7 +20,7 @@ public class ManualItemStepDefinitions {
       System.out.println("Deleted all items");
   }
 
-  @Given("item properties are {int} {int}")
+  @Given("create item with values {int} {int}")
   public void setItemProperties(int id, int title_id) {
       currentItem.setId(id);
       if(title_id != -1) {
@@ -28,10 +28,6 @@ public class ManualItemStepDefinitions {
           title.setId(title_id);
           currentItem.setTitle(title);
       }
-  }
-
-  @When("create current item")
-  public void createCurrentItem() {
       try{
           itemRepository.save(currentItem);
           System.out.println("Saved item with id: " + currentItem.getId());

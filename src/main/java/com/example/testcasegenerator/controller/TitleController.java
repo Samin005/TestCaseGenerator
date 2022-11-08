@@ -2,6 +2,8 @@ package com.example.testcasegenerator.controller;
 
 import com.example.testcasegenerator.model.Title;
 import com.example.testcasegenerator.repository.TitleRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -26,5 +28,28 @@ public class TitleController {
     @PostMapping
     public Title addNewTitle(@RequestBody Title newTitle) {
         return titleRepository.save(newTitle);
+    }
+
+    @RequestMapping(value = "/{titleId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    public ResponseEntity<Object> updateTitle (@PathVariable int titleId, @RequestBody Title updatedTitle) {
+        if(titleRepository.findById(titleId).isPresent()){
+            return new ResponseEntity<>(titleRepository.save(updatedTitle), HttpStatus.OK);
+        }
+        else return new ResponseEntity<>("No title found with ID: " + titleId, HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping("/{titleId}")
+    public ResponseEntity<Object> deleteTitleById(@PathVariable int titleId) {
+        if(titleRepository.findById(titleId).isPresent()){
+            titleRepository.deleteById(titleId);
+            return new ResponseEntity<>("Successfully deleted title", HttpStatus.OK);
+        }
+        else return new ResponseEntity<>("No title found with ID: " + titleId, HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping("/deleteAll")
+    public ResponseEntity<Object> deleteAllUsers() {
+        titleRepository.deleteAll();
+        return new ResponseEntity<>("Successfully deleted all titles", HttpStatus.OK);
     }
 }

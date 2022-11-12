@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
@@ -28,7 +29,8 @@ public class TestCaseGenerator {
                     String modelName = modelFile.getName().replace(".java", "");
                     System.out.println("Model name: " + modelName + "\n");
                     String classPath = modelFile.getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
-                    Field[] fields = Class.forName(classPath).getConstructor().newInstance().getClass().getDeclaredFields();
+                    System.out.println("classpath: " + classPath);
+                    Field[] fields = getFieldsFromModel(classPath);
                     for (Field field : fields) {
                         System.out.println("Field Name: " + field.getName());
                         System.out.println("Field Type: " + field.getType());
@@ -61,6 +63,10 @@ public class TestCaseGenerator {
         return null;
     }
 
+    private static Field[] getFieldsFromModel(String modelClassPath) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        return Class.forName(modelClassPath).getConstructor().newInstance().getClass().getDeclaredFields();
+    }
+
     private static void writeNullableInvalidCases(FileWriter fileWriter, Field[] fields, int notNullableCount) throws IOException {
         int lastNullAppliedIndex = -1;
         for(int i=0; i<notNullableCount; i++) {
@@ -77,6 +83,15 @@ public class TestCaseGenerator {
                     }
                     else
                         fileWriter.write("| test" + i + " ");
+                }
+                else {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                        fileWriter.write("| -1 ");
+                        nullAppliedForRow = true;
+                        lastNullAppliedIndex = j;
+                    }
+                    else
+                        fileWriter.write("| 1 ");
                 }
             }
             fileWriter.write("| invalid |\n         ");
@@ -136,14 +151,38 @@ public class TestCaseGenerator {
         return null;
     }
 
-    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String command) throws IOException {
+    private static void writeBackgroundForRelationalFields(FileWriter fileWriter, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        if(relationalFields.size() > 0) {
+            fileWriter.write("  Background: \n");
+            for(int i=0; i<relationalFields.size(); i++) {
+                String modelNameLowerCase = relationalFields.get(i).getType().toString().replaceAll("class \\S+"+MODEL_PACKAGE_NAME+".", "").toLowerCase();
+                Field[] modelFields = getFieldsFromModel(relationalFields.get(i).getType().toString().replace("class ", ""));
+                String command = "Given";
+                if(i>0)
+                    command = "And";
+                writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelFields, modelNameLowerCase, command, "values");
+            }
+            fileWriter.write("\n");
+        }
+    }
+
+    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String command, String format) throws IOException {
         fileWriter.write("      "+command+" create "+ modelNameLowerCase+" with values ");
         for(Field field: fields) {
             if(field.getType().toString().endsWith("Integer")) {
-                fileWriter.write("<" + field.getName() + "> ");
+                if(format.equals("example table"))
+                    fileWriter.write("<" + field.getName() + "> ");
+                else fileWriter.write("1 ");
             }
             else if(field.getType().toString().endsWith("String")) {
-                fileWriter.write("\"<" + field.getName() + ">\" ");
+                if(format.equals("example table"))
+                    fileWriter.write("\"<" + field.getName() + ">\" ");
+                else fileWriter.write("\"test-" + field.getName() + "\" ");
+            }
+            else {
+                if(format.equals("example table"))
+                    fileWriter.write("<" + field.getName() + "_id> ");
+                else fileWriter.write("1 ");
             }
         }
         fileWriter.write("\n");
@@ -158,21 +197,31 @@ public class TestCaseGenerator {
                 else if(field.getType().toString().endsWith("String")) {
                     fileWriter.write("| test"+i+" ");
                 }
+                else fileWriter.write("| " + 1 + " ");
             }
             fileWriter.write("| valid |\n         ");
         }
     }
 
+    private static void writeExampleTableHeaderForCreation(FileWriter fileWriter, Field[] fields) throws IOException {
+        for(Field field: fields) {
+            if(field.getType().toString().endsWith("Integer") | field.getType().toString().endsWith("String")) {
+                fileWriter.write("| " + field.getName() + " ");
+            }
+            else fileWriter.write("| " + field.getName() + "_id ");
+        }
+        fileWriter.write("| status |\n         ");
+    }
+
     private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount) throws IOException {
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "When");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "When", "example table");
         fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        for(Field field: fields)
-            fileWriter.write("| " + field.getName() + " ");
-        fileWriter.write("| status |\n         ");
+        writeExampleTableHeaderForCreation(fileWriter, fields);
+
         // valid case
         for(Field field: fields) {
             if(field.getType().toString().endsWith("Integer")) {
@@ -181,6 +230,7 @@ public class TestCaseGenerator {
             else if(field.getType().toString().endsWith("String")) {
                 fileWriter.write("| test ");
             }
+            else fileWriter.write("| " + 1 + " ");
         }
         fileWriter.write("| valid |\n         ");
         // invalid nullable cases
@@ -190,13 +240,12 @@ public class TestCaseGenerator {
 
     private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "example table");
         fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        for(Field field: fields)
-            fileWriter.write("| " + field.getName() + " ");
-        fileWriter.write("| status |\n         ");
+        writeExampleTableHeaderForCreation(fileWriter, fields);
+
         // valid case
         writeValidExampleRowsWithAllFields(2, fileWriter, fields);
 
@@ -226,19 +275,17 @@ public class TestCaseGenerator {
     private static void writeTestScenarioFetchOrDeleteAfterModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, Field[] fields, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "example table");
         fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        for(Field field: fields)
-            fileWriter.write("| " + field.getName() + " ");
-        fileWriter.write("| status |\n         ");
+        writeExampleTableHeaderForCreation(fileWriter, fields);
         // valid cases
         writeValidExampleRowsWithAllFields(2, fileWriter, fields);
         fileWriter.write("\n");
     }
 
-    public static void createFeatureFile(String modelName, Field[] fields) throws IOException {
+    public static void createFeatureFile(String modelName, Field[] fields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         // create directory if it does not exist
         File directory = new File("src/test/resources");
         directory.mkdir();
@@ -254,14 +301,22 @@ public class TestCaseGenerator {
         String idFieldName = findIdFieldName(fields);
         int notNullableCount = 0;
         int uniqueCount = 0;
+        ArrayList<Field> relationalFields = new ArrayList<>();
         for(Field field: fields) {
             if(!Arrays.toString(field.getAnnotations()).contains("Id()")) {
                 if(Arrays.toString(field.getAnnotations()).contains("nullable=false"))
                     notNullableCount++;
                 if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
                     uniqueCount++;
+                if((Arrays.toString(field.getAnnotations()).contains("OneToOne")) | Arrays.toString(field.getAnnotations()).contains("ManyToOne") | Arrays.toString(field.getAnnotations()).contains("ManyToMany") & Arrays.toString(field.getAnnotations()).contains("optional=false")) {
+                    relationalFields.add(field);
+                    notNullableCount++;
+                }
             }
         }
+
+        // create background
+        writeBackgroundForRelationalFields(fileWriter, relationalFields);
 
         // create scenario
         writeTestScenarioCreateSingleModel(fileWriter, fields, modelNameLowerCase, notNullableCount);

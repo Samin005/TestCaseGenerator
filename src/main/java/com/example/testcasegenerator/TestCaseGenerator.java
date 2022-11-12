@@ -213,11 +213,16 @@ public class TestCaseGenerator {
         fileWriter.write("| status |\n         ");
     }
 
+    private static void writeStatementForDatabaseSnapshot(FileWriter fileWriter, String modelNameLowerCase, String command) throws IOException {
+        fileWriter.write("      " + command + " save database snapshot for "+ modelNameLowerCase+"s and rest of the world\n");
+    }
+
     private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount) throws IOException {
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
+        writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "And");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "When", "example table");
-        fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\"\n");
+        fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         writeExampleTableHeaderForCreation(fileWriter, fields);
@@ -240,8 +245,9 @@ public class TestCaseGenerator {
 
     private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
+        writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "Given");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "example table");
-        fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\"\n");
+        fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         writeExampleTableHeaderForCreation(fileWriter, fields);
@@ -259,7 +265,8 @@ public class TestCaseGenerator {
     private static void writeTestScenarioFetchOrDeleteBeforeModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" without creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
+        writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "And");
+        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         fileWriter.write("| " + idFieldName + " ");
@@ -276,7 +283,8 @@ public class TestCaseGenerator {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
         writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "example table");
-        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\"\n");
+        writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "And");
+        fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
         writeExampleTableHeaderForCreation(fileWriter, fields);

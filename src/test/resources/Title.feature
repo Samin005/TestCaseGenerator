@@ -2,16 +2,18 @@ Feature: Title
 
   Scenario Outline: create single title
       Given delete existing titles
+      And save database snapshot for titles and rest of the world
       When create title with values <id> "<isbn>" 
-      Then create single title status should be "<status>"
+      Then create single title status should be "<status>" with snapshot validation
       Examples:
          | id | isbn | status |
          | 1 | test | valid |
          | 1 | null | invalid |
          
   Scenario Outline: create multiple titles
+      Given save database snapshot for titles and rest of the world
       Given create title with values <id> "<isbn>" 
-      Then create title status should be "<status>"
+      Then create title status should be "<status>" with snapshot validation
       Examples:
          | id | isbn | status |
          | 1 | test1 | valid |
@@ -21,7 +23,8 @@ Feature: Title
          
   Scenario Outline: fetch title without creation
       Given delete existing titles
-      Then fetching title <id> should be "<status>"
+      And save database snapshot for titles and rest of the world
+      Then fetching title <id> should be "<status>" with snapshot validation
       Examples:
          | id | status |
          | 1 | invalid |
@@ -30,7 +33,8 @@ Feature: Title
   Scenario Outline: fetch title after creation
       Given delete existing titles
       And create title with values <id> "<isbn>" 
-      Then fetching title <id> should be "<status>"
+      And save database snapshot for titles and rest of the world
+      Then fetching title <id> should be "<status>" with snapshot validation
       Examples:
          | id | isbn | status |
          | 1 | test1 | valid |
@@ -38,7 +42,8 @@ Feature: Title
          
   Scenario Outline: delete title without creation
       Given delete existing titles
-      Then deleting title <id> should be "<status>"
+      And save database snapshot for titles and rest of the world
+      Then deleting title <id> should be "<status>" with snapshot validation
       Examples:
          | id | status |
          | 1 | invalid |
@@ -47,7 +52,8 @@ Feature: Title
   Scenario Outline: delete title after creation
       Given delete existing titles
       And create title with values <id> "<isbn>" 
-      Then deleting title <id> should be "<status>"
+      And save database snapshot for titles and rest of the world
+      Then deleting title <id> should be "<status>" with snapshot validation
       Examples:
          | id | isbn | status |
          | 1 | test1 | valid |

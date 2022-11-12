@@ -2,8 +2,9 @@ Feature: User
 
   Scenario Outline: create single user
       Given delete existing users
+      And save database snapshot for users and rest of the world
       When create user with values <id> "<name>" "<email>" 
-      Then create single user status should be "<status>"
+      Then create single user status should be "<status>" with snapshot validation
       Examples:
          | id | name | email | status |
          | 1 | test | test | valid |
@@ -11,8 +12,9 @@ Feature: User
          | 1 | test1 | null | invalid |
          
   Scenario Outline: create multiple users
+      Given save database snapshot for users and rest of the world
       Given create user with values <id> "<name>" "<email>" 
-      Then create user status should be "<status>"
+      Then create user status should be "<status>" with snapshot validation
       Examples:
          | id | name | email | status |
          | 1 | test1 | test1 | valid |
@@ -23,7 +25,8 @@ Feature: User
          
   Scenario Outline: fetch user without creation
       Given delete existing users
-      Then fetching user <id> should be "<status>"
+      And save database snapshot for users and rest of the world
+      Then fetching user <id> should be "<status>" with snapshot validation
       Examples:
          | id | status |
          | 1 | invalid |
@@ -32,7 +35,8 @@ Feature: User
   Scenario Outline: fetch user after creation
       Given delete existing users
       And create user with values <id> "<name>" "<email>" 
-      Then fetching user <id> should be "<status>"
+      And save database snapshot for users and rest of the world
+      Then fetching user <id> should be "<status>" with snapshot validation
       Examples:
          | id | name | email | status |
          | 1 | test1 | test1 | valid |
@@ -40,7 +44,8 @@ Feature: User
          
   Scenario Outline: delete user without creation
       Given delete existing users
-      Then deleting user <id> should be "<status>"
+      And save database snapshot for users and rest of the world
+      Then deleting user <id> should be "<status>" with snapshot validation
       Examples:
          | id | status |
          | 1 | invalid |
@@ -49,7 +54,8 @@ Feature: User
   Scenario Outline: delete user after creation
       Given delete existing users
       And create user with values <id> "<name>" "<email>" 
-      Then deleting user <id> should be "<status>"
+      And save database snapshot for users and rest of the world
+      Then deleting user <id> should be "<status>" with snapshot validation
       Examples:
          | id | name | email | status |
          | 1 | test1 | test1 | valid |

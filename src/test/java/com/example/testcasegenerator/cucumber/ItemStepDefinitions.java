@@ -8,7 +8,7 @@ import java.util.*;
 import com.example.testcasegenerator.model.*;
 import com.example.testcasegenerator.repository.*;
 
-public class UserStepDefinitions {
+public class ItemStepDefinitions {
   @Autowired
   private ItemRepository itemRepository;
   private Iterable<Item> itemSnapshot;
@@ -21,37 +21,35 @@ public class UserStepDefinitions {
   @Autowired
   private UserRepository userRepository;
   private Iterable<User> userSnapshot;
-  private User currentUser = new User();
+  private Item currentItem = new Item();
 
-  @Given("delete existing users")
-  public void deleteExistingUsers() {
-      userRepository.deleteAll();
-      assertEquals(0, userRepository.count());
-      System.out.println("Deleted all users");
+  @Given("delete existing items")
+  public void deleteExistingItems() {
+      itemRepository.deleteAll();
+      assertEquals(0, itemRepository.count());
+      System.out.println("Deleted all items");
   }
 
-  @Given("create user with values {int} {string} {string}")
-  public void setUserProperties(int id, String name, String email) {
-      currentUser.setId(id);
-      name = name.equals("null") ? null : name;
-      currentUser.setName(name);
-      email = email.equals("null") ? null : email;
-      currentUser.setEmail(email);
+  @Given("create item with values {int} {int}")
+  public void setItemProperties(int id, int title_id) {
+      currentItem.setId(id);
+      if(title_id != -1) 
+          currentItem.setTitle(titleRepository.findById(title_id).get());
       try{
-          userRepository.save(currentUser);
-          System.out.println("Saved user with id: " + currentUser.getId());
+          itemRepository.save(currentItem);
+          System.out.println("Saved item with id: " + currentItem.getId());
       } catch (Exception e) {
           e.printStackTrace();
       }
   }
 
-  private User getUserById(int id) {
-      if(userRepository.findById(id).isPresent())
-          return userRepository.findById(id).get();
+  private Item getItemById(int id) {
+      if(itemRepository.findById(id).isPresent())
+          return itemRepository.findById(id).get();
       else return null;
   }
 
-  @Given("save database snapshot for users and rest of the world")
+  @Given("save database snapshot for items and rest of the world")
   public void saveDatabaseSnapshot() {
       itemSnapshot = itemRepository.findAll();
       loanSnapshot = loanRepository.findAll();
@@ -77,71 +75,72 @@ public class UserStepDefinitions {
           assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));
   }
 
-  private void assertUserObjectEquals(User user) {
-      assertTrue(new ReflectionEquals(user).matches(currentUser));
+  private void assertItemObjectEquals(Item item) {
+      assertTrue(new ReflectionEquals(item, new String[]{"title"}).matches(currentItem));
+      assertTrue(new ReflectionEquals(item.getTitle().getId()).matches(currentItem.getTitle().getId()));
   }
 
   private void assertOtherEntitiesUnchanged() {
-      assertEntityEquals(itemSnapshot, itemRepository.findAll(), new String[]{"title"});
       assertEntityEquals(loanSnapshot, loanRepository.findAll(), new String[]{"user", "item"});
       assertEntityEquals(titleSnapshot, titleRepository.findAll(), null);
+      assertEntityEquals(userSnapshot, userRepository.findAll(), null);
   }
 
-  private void assertCreationStatusWithSnapshotValidation(User createdUser) {
-      assertUserObjectEquals(createdUser);
-      assertRemainingEntries(userSnapshot, userRepository.findAll(), null);
+  private void assertCreationStatusWithSnapshotValidation(Item createdItem) {
+      assertItemObjectEquals(createdItem);
+      assertRemainingEntries(itemSnapshot, itemRepository.findAll(), new String[]{"title"});
 
       assertOtherEntitiesUnchanged();
   }
 
   private void assertSnapshotUnchanged() {
-      assertEntityEquals(userSnapshot, userRepository.findAll(), null);
+      assertEntityEquals(itemSnapshot, itemRepository.findAll(), new String[]{"title"});
       assertOtherEntitiesUnchanged();
   }
 
-  @Then("create single user status should be {string} with snapshot validation")
-  public void checkSingleUserCreateStatus(String status) {
-      User createdUser = getUserById(currentUser.getId());
+  @Then("create single item status should be {string} with snapshot validation")
+  public void checkSingleItemCreateStatus(String status) {
+      Item createdItem = getItemById(currentItem.getId());
       if(status.equals("valid")) {
-          assertEquals(1, userRepository.count());
-          assertCreationStatusWithSnapshotValidation(createdUser);
+          assertEquals(1, itemRepository.count());
+          assertCreationStatusWithSnapshotValidation(createdItem);
       }
       else {
-          assertNotEquals(1, userRepository.count());
+          assertNotEquals(1, itemRepository.count());
           assertSnapshotUnchanged();
-          assertNull(createdUser);
+          assertNull(createdItem);
       }
   }
 
-  @Then("create user status should be {string} with snapshot validation")
-  public void checkUserCreateStatus(String status) {
-      User createdUser = getUserById(currentUser.getId());
+  @Then("create item status should be {string} with snapshot validation")
+  public void checkItemCreateStatus(String status) {
+      Item createdItem = getItemById(currentItem.getId());
       if(status.equals("valid")) {
-          assertCreationStatusWithSnapshotValidation(createdUser);
+          assertCreationStatusWithSnapshotValidation(createdItem);
       }
       else assertSnapshotUnchanged();
   }
 
-  @Then("fetching user {int} should be {string} with snapshot validation")
-  public void fetchingUserStatus(int id, String status) {
-      User fetchedUser = getUserById(id);
+  @Then("fetching item {int} should be {string} with snapshot validation")
+  public void fetchingItemStatus(int id, String status) {
+      Item fetchedItem = getItemById(id);
       if(status.equals("valid")) {
-          assertUserObjectEquals(fetchedUser);
+          assertItemObjectEquals(fetchedItem);
       }
-      else assertNull(fetchedUser);
+      else assertNull(fetchedItem);
       assertSnapshotUnchanged();
   }
 
   private void assertDeletionStatusWithSnapshotValidation() {
-      assertRemainingEntries(userRepository.findAll(), userSnapshot, null);
+      assertRemainingEntries(itemRepository.findAll(), itemSnapshot, new String[]{"title"});
 
       assertOtherEntitiesUnchanged();
   }
 
-  @Then("deleting user {int} should be {string} with snapshot validation")
-  public void deletingUserStatus(int id, String status) {
+  @Then("deleting item {int} should be {string} with snapshot validation")
+  public void deletingItemStatus(int id, String status) {
       try{
-          userRepository.deleteById(id);
+          itemRepository.deleteById(id);
           assertEquals("valid", status);
           assertDeletionStatusWithSnapshotValidation();
       } catch (Exception e) {

@@ -7,17 +7,21 @@
 #  Scenario Outline: create single loan
 #    Given delete existing loans
 #    And save database snapshot for loans and rest of the world
-#    And create loan with values <id> <user_id> <item_id>
+#    And create loan with values <id> <user_id> <item_id> <renewal> <created_due_interval>
 #    Then create single loan status should be "<status>" with snapshot validation
 #    Examples:
-#      | id | user_id | item_id | status  |
-#      | 1  | 1       | 1       | valid   |
-#      | 1  | -1      | 1       | invalid |
-#      | 1  | 1       | -1      | invalid |
+#      | id | user_id | item_id | renewal | created_due_interval | status  |
+#      | 1  | 1       | 1       | 2       | 20                   | valid   |
+#      | 1  | -1      | 1       | 2       | 20                   | invalid |
+#      | 1  | 1       | -1      | 2       | 20                   | invalid |
+#      | 1  | 1       | 1       | 1       | 20                   | valid   |
+#      | 1  | 1       | 1       | 3       | 20                   | invalid |
+#      | 1  | 1       | 1       | 2       | 19                   | invalid |
+#      | 1  | 1       | 1       | 2       | 21                   | invalid |
 #
 #  Scenario Outline: create multiple loans
 #    Given save database snapshot for loans and rest of the world
-#    And create loan with values <id> <user_id> <item_id>
+#    And create loan with values <id> <user_id> <item_id> <renewal> <created_due_interval>
 #    Then create loan status should be "<status>" with snapshot validation
 #    Examples:
 #      | id | user_id | item_id | status  |

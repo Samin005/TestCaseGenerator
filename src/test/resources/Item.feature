@@ -21,7 +21,7 @@ Feature: Item
          | id | title_id | status |
          | 1 | 1 | valid |
          | 2 | 1 | valid |
-         | 1 | -1 | invalid |
+         | 2 | -1 | invalid |
          
   Scenario Outline: fetch item without creation
       Given delete existing items

@@ -7,7 +7,7 @@ Feature: User
       Then create single user status should be "<status>" with snapshot validation
       Examples:
          | id | name | email | status |
-         | 1 | test | test | valid |
+         | 1 | test1 | test1 | valid |
          | 1 | null | test0 | invalid |
          | 1 | test1 | null | invalid |
          
@@ -20,8 +20,8 @@ Feature: User
          | 1 | test1 | test1 | valid |
          | 2 | test2 | test2 | valid |
          | 2 | test2 | test1 | invalid |
-         | 1 | null | test0 | invalid |
-         | 1 | test1 | null | invalid |
+         | 2 | null | test0 | invalid |
+         | 2 | test1 | null | invalid |
          
   Scenario Outline: fetch user without creation
       Given delete existing users

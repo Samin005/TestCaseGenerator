@@ -7,7 +7,7 @@ Feature: Title
       Then create single title status should be "<status>" with snapshot validation
       Examples:
          | id | isbn | status |
-         | 1 | test | valid |
+         | 1 | test1 | valid |
          | 1 | null | invalid |
          
   Scenario Outline: create multiple titles
@@ -19,7 +19,7 @@ Feature: Title
          | 1 | test1 | valid |
          | 2 | test2 | valid |
          | 2 | test1 | invalid |
-         | 1 | null | invalid |
+         | 2 | null | invalid |
          
   Scenario Outline: fetch title without creation
       Given delete existing titles

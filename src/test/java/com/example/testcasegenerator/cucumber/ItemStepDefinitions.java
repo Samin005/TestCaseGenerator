@@ -66,13 +66,19 @@ public class ItemStepDefinitions {
   }
 
   private void assertRemainingEntries(Iterable expectedEntriesIterable, Iterable actualEntriesIterable, String[] foreignKeys) {
-      ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);
-      actualEntriesList.remove(actualEntriesList.size() - 1);
-      Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();
       Object[] expectedEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();
-      assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);
-      for(int i = 0; i < expectedEntries.length; i++)
-          assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));
+      Object[] actualEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();
+      if(expectedEntries.length == actualEntries.length) 
+          for(int i = 0; i < expectedEntries.length; i++) 
+              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntries[i]));
+      else {
+          ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);
+          actualEntriesList.remove(actualEntriesList.size() - 1);
+          Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();
+          assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);
+          for(int i = 0; i < expectedEntries.length; i++)
+              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));
+      }
   }
 
   private void assertItemObjectEquals(Item item) {

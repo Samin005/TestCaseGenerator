@@ -30,13 +30,15 @@ public class LoanStepDefinitions {
       System.out.println("Deleted all loans");
   }
 
-  @Given("create loan with values {int} {int} {int}")
-  public void setLoanProperties(int id, int user_id, int item_id) {
+  @Given("create loan with values {int} {int} {int} {int} {int}")
+  public void setLoanProperties(int id, int user_id, int item_id, int renewal, int created_due_interval) {
+      currentLoan = new Loan(created_due_interval);
       currentLoan.setId(id);
       if(user_id != -1) 
           currentLoan.setUser(userRepository.findById(user_id).get());
       if(item_id != -1) 
           currentLoan.setItem(itemRepository.findById(item_id).get());
+      currentLoan.setRenewal(renewal);
       try{
           loanRepository.save(currentLoan);
           System.out.println("Saved loan with id: " + currentLoan.getId());
@@ -68,19 +70,27 @@ public class LoanStepDefinitions {
   }
 
   private void assertRemainingEntries(Iterable expectedEntriesIterable, Iterable actualEntriesIterable, String[] foreignKeys) {
-      ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);
-      actualEntriesList.remove(actualEntriesList.size() - 1);
-      Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();
       Object[] expectedEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();
-      assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);
-      for(int i = 0; i < expectedEntries.length; i++)
-          assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));
+      Object[] actualEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();
+      if(expectedEntries.length == actualEntries.length) 
+          for(int i = 0; i < expectedEntries.length; i++) 
+              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntries[i]));
+      else {
+          ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);
+          actualEntriesList.remove(actualEntriesList.size() - 1);
+          Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();
+          assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);
+          for(int i = 0; i < expectedEntries.length; i++)
+              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));
+      }
   }
 
   private void assertLoanObjectEquals(Loan loan) {
-      assertTrue(new ReflectionEquals(loan, new String[]{"user", "item"}).matches(currentLoan));
+      assertTrue(new ReflectionEquals(loan, new String[]{"user", "item", "created", "due"}).matches(currentLoan));
       assertTrue(new ReflectionEquals(loan.getUser().getId()).matches(currentLoan.getUser().getId()));
       assertTrue(new ReflectionEquals(loan.getItem().getId()).matches(currentLoan.getItem().getId()));
+      assertTrue(new ReflectionEquals(loan.getCreated()).matches(currentLoan.getCreated()));
+      assertTrue(new ReflectionEquals(loan.getDue()).matches(currentLoan.getDue()));
   }
 
   private void assertOtherEntitiesUnchanged() {

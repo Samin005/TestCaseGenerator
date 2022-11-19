@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -15,6 +16,9 @@ import java.util.Scanner;
 public class TestCaseGenerator {
     static String MODEL_PACKAGE_NAME = "model";
     static String REPOSITORY_PACKAGE_NAME = "repository";
+
+    static int INT_DEFAULT_VALUE = 1;
+    static String STRING_DEFAULT_VALUE = "test";
 
     public static void main(String[] args) {
         try {
@@ -27,8 +31,11 @@ public class TestCaseGenerator {
             for (File modelFile : modelsList) {
                 if(modelFile.isFile() && modelFile.getName().endsWith(".java")) {
                     String modelName = modelFile.getName().replace(".java", "");
-                    System.out.println("Model name: " + modelName + "\n");
+                    System.out.println("Model name: " + modelName);
                     String classPath = getClasspathFromModelFile(modelFile);
+                    Annotation[] modelAnnotations = getModelAnnotationsFromModelClassPath(classPath);
+                    String[] modelConstraints = getModelConstraintsFromModelAnnotations(modelAnnotations);
+                    System.out.println("Model Constraints: "+modelConstraints.length+ Arrays.toString(modelConstraints)+"\n");
                     Field[] fields = getFieldsFromModelClassPath(classPath);
                     for (Field field : fields) {
                         System.out.println("Field Name: " + field.getName());
@@ -36,11 +43,11 @@ public class TestCaseGenerator {
                         System.out.println("Field Annotations: " + Arrays.toString(field.getAnnotations()) + "\n");
                     }
                     ArrayList<Field> relationalFields = getRelationalFields(fields);
-                    createFeatureFile(modelName, fields, relationalFields);
+                    createFeatureFile(modelName, modelConstraints, fields, relationalFields);
                     // find model repository
                     String modelRepositoryName = findModelRepository(modelName, repositoriesList);
                     Method[] methods = Class.forName(classPath).getConstructor().newInstance().getClass().getMethods();
-                    createStepDefinitionsFile(classPath, modelName, modelRepositoryName, fields, relationalFields, methods, modelsList, repositoriesList);
+                    createStepDefinitionsFile(classPath, modelName, modelConstraints, modelRepositoryName, fields, relationalFields, methods, modelsList, repositoriesList);
                 }
             }
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | InvocationTargetException |
@@ -67,6 +74,10 @@ public class TestCaseGenerator {
         return modelFile.getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
     }
 
+    private static Annotation[] getModelAnnotationsFromModelClassPath(String modelClassPath) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        return Class.forName(modelClassPath).getConstructor().newInstance().getClass().getAnnotations();
+    }
+
     private static Field[] getFieldsFromModelClassPath(String modelClassPath) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         return Class.forName(modelClassPath).getConstructor().newInstance().getClass().getDeclaredFields();
     }
@@ -75,6 +86,14 @@ public class TestCaseGenerator {
         return type.replaceAll("class \\S+"+MODEL_PACKAGE_NAME+".", "");
     }
 
+    private static String[] getModelConstraintsFromModelAnnotations(Annotation[] modelAnnotations) {
+        String modelConstraintsString = "";
+        for(Annotation modelAnnotation: modelAnnotations) {
+            if(modelAnnotation.toString().contains("@org.hibernate.annotations.Check(constraints="))
+                modelConstraintsString = modelAnnotation.toString().replace("@org.hibernate.annotations.Check(constraints=", "").replaceAll("\"", "").replace(")", "");
+        }
+        return modelConstraintsString.split(" AND ");
+    }
     private static ArrayList<Field> getRelationalFields(Field[] fields) {
         ArrayList<Field> relationalFields = new ArrayList<>();
         for (Field field : fields) {
@@ -90,55 +109,6 @@ public class TestCaseGenerator {
 
     private static boolean isCustomModelField(Field field) {
         return field.getType().toString().contains(MODEL_PACKAGE_NAME + ".");
-    }
-
-    private static void writeNullableInvalidCases(FileWriter fileWriter, Field[] fields, int notNullableCount) throws IOException {
-        int lastNullAppliedIndex = -1;
-        for(int i=0; i<notNullableCount; i++) {
-            boolean nullAppliedForRow = false;
-            for(int j=0; j<fields.length; j++) {
-                if(fields[j].getType().toString().endsWith("Integer")) {
-                    fileWriter.write("| " + 1 + " ");
-                }
-                else if(fields[j].getType().toString().endsWith("String")) {
-                    if(Arrays.toString(fields[j].getAnnotations()).contains("nullable=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
-                        fileWriter.write("| null ");
-                        nullAppliedForRow = true;
-                        lastNullAppliedIndex = j;
-                    }
-                    else
-                        fileWriter.write("| test" + i + " ");
-                }
-                else if(isCustomModelField(fields[j])) {
-                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
-                        fileWriter.write("| -1 ");
-                        nullAppliedForRow = true;
-                        lastNullAppliedIndex = j;
-                    }
-                    else
-                        fileWriter.write("| 1 ");
-                }
-            }
-            fileWriter.write("| invalid |\n         ");
-        }
-    }
-
-    private static void writeUniqueInvalidCases(FileWriter fileWriter, Field[] fields, int uniqueCount) throws IOException {
-        int idCounter = 2;
-        for(int i=0; i<uniqueCount; i++) {
-            for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
-                    fileWriter.write("| " + idCounter + " ");
-                }
-                else if(field.getType().toString().endsWith("String")) {
-                    if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
-                        fileWriter.write("| test"+(idCounter-1)+" ");
-                    else
-                        fileWriter.write("| test"+idCounter+" ");
-                }
-            }
-            fileWriter.write("| invalid |\n         ");
-        }
     }
 
     private static String findModelRepository(String modelName, File[] repositoriesList) throws FileNotFoundException {
@@ -175,8 +145,170 @@ public class TestCaseGenerator {
         }
         return null;
     }
+    private static boolean isNumber(String string) {
+        try {
+            Integer.parseInt(string);
+            return true;
+        } catch(NumberFormatException e){
+            return false;
+        }
+    }
 
-    private static void writeBackgroundForRelationalFields(FileWriter fileWriter, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    private static String[] getModelConstraintDividedBasedOnField(String[] modelConstraints, Field field) {
+        for(String modelConstraint: modelConstraints) {
+            String[] modelConstraintDivided = modelConstraint.split(" ", 3);
+            if(modelConstraintDivided[0].equals(field.getName()))
+                return modelConstraintDivided;
+        }
+        return null;
+    }
+
+    private static int getFieldValueFromModelConstraints(String[] modelConstraints, Field field) {
+        if(getModelConstraintDividedBasedOnField(modelConstraints, field) != null) {
+            String[] modelConstraintDivided = getModelConstraintDividedBasedOnField(modelConstraints, field);
+            String condition = modelConstraintDivided[1];
+            String secondOperand = modelConstraintDivided[2];
+            if(condition.contains("=")){
+                if(isNumber(secondOperand))
+                    return Integer.parseInt(secondOperand);
+                else {
+                    String[] secondOperandDivided = secondOperand.split(" ");
+                    for(String secondOperandStrings: secondOperandDivided) {
+                        if(isNumber(secondOperandStrings))
+                            return Integer.parseInt(secondOperandStrings);
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static String getParameterNameForMultiFieldConstraints(String[] modelConstraints, Field field, Field[] fields) {
+        String parameterName = null;
+        if(getModelConstraintDividedBasedOnField(modelConstraints, field) != null) {
+            String[] modelConstraintDivided = getModelConstraintDividedBasedOnField(modelConstraints, field);
+            String secondOperand = modelConstraintDivided[2];
+            for(Field currentField: fields) {
+                if(!currentField.getName().equals(field.getName()) && secondOperand.contains(currentField.getName())) {
+                    parameterName = currentField.getName() + "_" + field.getName();
+                    if(secondOperand.contains("interval"))
+                        parameterName += "_interval";
+                    else parameterName += "_condition";
+                }
+            }
+        }
+        return parameterName;
+    }
+
+    private static void writeNullableInvalidCases(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String idFieldName, int idCounter, int notNullableCount) throws IOException {
+        int lastNullAppliedIndex = -1;
+        for(int i=0; i<notNullableCount; i++) {
+            boolean nullAppliedForRow = false;
+            for(int j=0; j<fields.length; j++) {
+                if(fields[j].getName().equals(idFieldName)) {
+                    fileWriter.write("| " + idCounter + " ");
+                }
+                else if(fields[j].getType().toString().endsWith("String")) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("nullable=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                        fileWriter.write("| null ");
+                        nullAppliedForRow = true;
+                        lastNullAppliedIndex = j;
+                    }
+                    else
+                        fileWriter.write("| " + STRING_DEFAULT_VALUE + i + " ");
+                }
+                else if(fields[j].getType().toString().endsWith("Integer") || fields[j].getType().toString().equals("int") || isCustomModelField(fields[j])) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                        fileWriter.write("| -1 ");
+                        nullAppliedForRow = true;
+                        lastNullAppliedIndex = j;
+                    }
+                    else
+                        fileWriter.write("| " + INT_DEFAULT_VALUE + " ");
+                }
+                else if(getParameterNameForMultiFieldConstraints(modelConstraints, fields[j], fields) != null) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                        fileWriter.write("| -1 ");
+                        nullAppliedForRow = true;
+                        lastNullAppliedIndex = j;
+                    }
+                    else
+                        fileWriter.write("| " + getFieldValueFromModelConstraints(modelConstraints, fields[j]) + " ");
+                }
+            }
+            fileWriter.write("| invalid |\n         ");
+        }
+    }
+
+    private static void writeUniqueInvalidCases(FileWriter fileWriter, Field[] fields, String idFieldName, int idCounter, int uniqueCount) throws IOException {
+        for(int i=0; i<uniqueCount; i++) {
+            for(Field field: fields) {
+                if(field.getName().equals(idFieldName)) {
+                    fileWriter.write("| " + idCounter + " ");
+                }
+                else if(field.getType().toString().endsWith("String")) {
+                    if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
+                        fileWriter.write("| "+STRING_DEFAULT_VALUE+(idCounter-1)+" ");
+                    else
+                        fileWriter.write("| "+STRING_DEFAULT_VALUE+idCounter+" ");
+                }
+                else if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || isCustomModelField(field)) {
+                    if(Arrays.toString(field.getAnnotations()).contains("unique=true") || Arrays.toString(field.getAnnotations()).contains("optional=false"))
+                        fileWriter.write("| "+(idCounter-1)+" ");
+                    else
+                        fileWriter.write("| "+idCounter+" ");
+                }
+            }
+            fileWriter.write("| invalid |\n         ");
+        }
+    }
+
+    private static void writeConstraintViolationCases(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String idFieldName, int idCounter) throws IOException {
+        if(!Arrays.toString(modelConstraints).equals("[]")) {
+            String status = "valid";
+            int lastUpdatedIndex = -1;
+            for(int i=0; i<modelConstraints.length; i++) {
+                boolean previousValueSet = false;
+                boolean afterValueSet = false;
+                for(int j=1; j<=2; j++){
+                    for(int k=0; k<fields.length; k++) {
+                        if(fields[k].getName().equals(idFieldName)) {
+                            fileWriter.write("| " + idCounter + " ");
+                        }
+                        else if(Arrays.toString(modelConstraints).contains(fields[k].getName()) && getFieldValueFromModelConstraints(modelConstraints, fields[k]) != 0) {
+                            if(j==1 && !previousValueSet && lastUpdatedIndex != k){ // n-1
+                                fileWriter.write("| " + (getFieldValueFromModelConstraints(modelConstraints, fields[k])-1) + " ");
+                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].equals("<="))
+                                    status = "valid";
+                                else
+                                    status = "invalid";
+                                previousValueSet = true;
+                            }
+                            else if(j==2 && !afterValueSet && lastUpdatedIndex != k){ // n+1
+                                fileWriter.write("| " + (getFieldValueFromModelConstraints(modelConstraints, fields[k])+1) + " ");
+                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].equals("=>"))
+                                    status = "valid";
+                                else
+                                    status = "invalid";
+                                afterValueSet = true;
+                                if(previousValueSet && afterValueSet)
+                                    lastUpdatedIndex = k;
+                            }
+                            else fileWriter.write("| " + getFieldValueFromModelConstraints(modelConstraints, fields[k]) + " ");
+                        }
+                        else if(fields[k].getType().toString().endsWith("String")) {
+                            fileWriter.write("| "+STRING_DEFAULT_VALUE+j+" ");
+                        }
+                        else if(fields[k].getType().toString().endsWith("Integer") || fields[k].getType().toString().equals("int") || isCustomModelField(fields[k]))
+                            fileWriter.write("| " + INT_DEFAULT_VALUE + " ");
+                    }
+                    fileWriter.write("| "+status+" |\n         ");
+                }
+            }
+        }
+    }
+
+    private static void writeBackgroundForRelationalFields(FileWriter fileWriter, String[] modelConstraints, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         if(relationalFields.size() > 0) {
             fileWriter.write("  Background: \n");
             for(int i=0; i<relationalFields.size(); i++) {
@@ -185,57 +317,66 @@ public class TestCaseGenerator {
                 String command = "Given";
                 if(i>0)
                     command = "And";
-                writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelFields, modelNameLowerCase, command, "values");
+                writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, modelFields, modelNameLowerCase, command, "values");
             }
             fileWriter.write("\n");
         }
     }
 
-    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, String command, String format) throws IOException {
+    private static void writeStatementsForCreatingCurrentModelWithAllFields(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String modelNameLowerCase, String command, String format) throws IOException {
         fileWriter.write("      "+command+" create "+ modelNameLowerCase+" with values ");
         for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer")) {
+            if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int")) {
                 if(format.equals("example table"))
                     fileWriter.write("<" + field.getName() + "> ");
-                else fileWriter.write("1 ");
+                else fileWriter.write(INT_DEFAULT_VALUE+" ");
             }
             else if(field.getType().toString().endsWith("String")) {
                 if(format.equals("example table"))
                     fileWriter.write("\"<" + field.getName() + ">\" ");
-                else fileWriter.write("\"test-" + field.getName() + "\" ");
+                else fileWriter.write("\""+STRING_DEFAULT_VALUE+"-" + field.getName() + "\" ");
             }
             else if(isCustomModelField(field)){
                 if(format.equals("example table"))
                     fileWriter.write("<" + field.getName() + "_id> ");
-                else fileWriter.write("1 ");
+                else fileWriter.write(INT_DEFAULT_VALUE+" ");
             }
+            else if(getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) != null)
+                if(format.equals("example table"))
+                    fileWriter.write("<" + getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) + "> ");
+                else fileWriter.write(getFieldValueFromModelConstraints(modelConstraints, field)+" ");
         }
         fileWriter.write("\n");
     }
 
-    private static void writeValidExampleRowsWithAllFields(int count, FileWriter fileWriter, Field[] fields) throws IOException {
+    private static void writeValidExampleRowsWithAllFields(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String idFieldName, int count) throws IOException {
         for(int i=1; i<=count; i++){
             for(Field field: fields) {
-                if(field.getType().toString().endsWith("Integer")) {
+                if(field.getName().equals(idFieldName)) {
                     fileWriter.write("| " + i + " ");
                 }
-                else if(field.getType().toString().endsWith("String")) {
-                    fileWriter.write("| test"+i+" ");
+                else if(Arrays.toString(modelConstraints).contains(field.getName()) && getFieldValueFromModelConstraints(modelConstraints, field) != 0) {
+                    fileWriter.write("| " + getFieldValueFromModelConstraints(modelConstraints, field) + " ");
                 }
-                else if(isCustomModelField(field))
-                    fileWriter.write("| " + 1 + " ");
+                else if(field.getType().toString().endsWith("String")) {
+                    fileWriter.write("| "+STRING_DEFAULT_VALUE+i+" ");
+                }
+                else if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || isCustomModelField(field))
+                    fileWriter.write("| " + INT_DEFAULT_VALUE + " ");
             }
             fileWriter.write("| valid |\n         ");
         }
     }
 
-    private static void writeExampleTableHeaderForCreation(FileWriter fileWriter, Field[] fields) throws IOException {
+    private static void writeExampleTableHeaderForCreation(FileWriter fileWriter, Field[] fields, String[] modelConstraints) throws IOException {
         for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer") | field.getType().toString().endsWith("String")) {
+            if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || field.getType().toString().endsWith("String")) {
                 fileWriter.write("| " + field.getName() + " ");
             }
             else if(isCustomModelField(field))
                 fileWriter.write("| " + field.getName() + "_id ");
+            else if(getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) != null)
+                fileWriter.write("| " + getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) + " ");
         }
         fileWriter.write("| status |\n         ");
     }
@@ -244,49 +385,44 @@ public class TestCaseGenerator {
         fileWriter.write("      " + command + " save database snapshot for "+ modelNameLowerCase+"s and rest of the world\n");
     }
 
-    private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount) throws IOException {
+    private static void writeTestScenarioCreateSingleModel(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String idFieldName, String modelNameLowerCase, int notNullableCount) throws IOException {
         fileWriter.write("  Scenario Outline: create single "+ modelNameLowerCase+"\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
         writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "And");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "When", "example table");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, fields, modelNameLowerCase, "When", "example table");
         fileWriter.write("      Then create single "+ modelNameLowerCase+" status should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        writeExampleTableHeaderForCreation(fileWriter, fields);
+        writeExampleTableHeaderForCreation(fileWriter, fields, modelConstraints);
 
         // valid case
-        for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer")) {
-                fileWriter.write("| " + 1 + " ");
-            }
-            else if(field.getType().toString().endsWith("String")) {
-                fileWriter.write("| test ");
-            }
-            else if(isCustomModelField(field))
-                fileWriter.write("| " + 1 + " ");
-        }
-        fileWriter.write("| valid |\n         ");
+        writeValidExampleRowsWithAllFields(fileWriter, modelConstraints, fields, idFieldName, 1);
+
         // invalid nullable cases
-        writeNullableInvalidCases(fileWriter, fields, notNullableCount);
+        writeNullableInvalidCases(fileWriter, modelConstraints, fields, idFieldName, 1, notNullableCount);
+        // constraint violation cases
+        writeConstraintViolationCases(fileWriter, modelConstraints, fields, idFieldName, 1);
         fileWriter.write("\n");
     }
 
-    private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, Field[] fields, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
+    private static void writeTestScenarioCreateMultipleModel(FileWriter fileWriter, String[] modelConstraints, Field[] fields, String idFieldName, String modelNameLowerCase, int notNullableCount, int uniqueCount) throws IOException {
         fileWriter.write("  Scenario Outline: create multiple "+ modelNameLowerCase+"s\n");
         writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "Given");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "Given", "example table");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, fields, modelNameLowerCase, "Given", "example table");
         fileWriter.write("      Then create "+ modelNameLowerCase+" status should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        writeExampleTableHeaderForCreation(fileWriter, fields);
+        writeExampleTableHeaderForCreation(fileWriter, fields, modelConstraints);
 
         // valid case
-        writeValidExampleRowsWithAllFields(2, fileWriter, fields);
+        writeValidExampleRowsWithAllFields(fileWriter, modelConstraints, fields, idFieldName, 2);
 
         // invalid unique cases
-        writeUniqueInvalidCases(fileWriter, fields, uniqueCount);
+        writeUniqueInvalidCases(fileWriter, fields, idFieldName, 2, uniqueCount);
         // invalid nullable cases
-        writeNullableInvalidCases(fileWriter, fields, notNullableCount);
+        writeNullableInvalidCases(fileWriter, modelConstraints, fields, idFieldName, 2, notNullableCount);
+        // constraint violation cases
+        writeConstraintViolationCases(fileWriter, modelConstraints, fields, idFieldName, 2);
         fileWriter.write("\n");
     }
 
@@ -307,21 +443,21 @@ public class TestCaseGenerator {
         fileWriter.write("\n");
     }
 
-    private static void writeTestScenarioFetchOrDeleteAfterModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, Field[] fields, String modelNameLowerCase) throws IOException {
+    private static void writeTestScenarioFetchOrDeleteAfterModelCreation(String command, String commanding, String idFieldName, FileWriter fileWriter, String[] modelConstraints, Field[] fields, String modelNameLowerCase) throws IOException {
         fileWriter.write("  Scenario Outline: "+command+" "+modelNameLowerCase+" after creation\n");
         fileWriter.write("      Given delete existing "+ modelNameLowerCase+"s\n");
-        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, fields, modelNameLowerCase, "And", "example table");
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, fields, modelNameLowerCase, "And", "example table");
         writeStatementForDatabaseSnapshot(fileWriter, modelNameLowerCase, "And");
         fileWriter.write("      Then "+commanding+" "+modelNameLowerCase+" <"+idFieldName+"> should be \"<status>\" with snapshot validation\n");
         fileWriter.write("      Examples:\n         ");
         // create example table
-        writeExampleTableHeaderForCreation(fileWriter, fields);
+        writeExampleTableHeaderForCreation(fileWriter, fields, modelConstraints);
         // valid cases
-        writeValidExampleRowsWithAllFields(2, fileWriter, fields);
+        writeValidExampleRowsWithAllFields(fileWriter, modelConstraints, fields, idFieldName, 2);
         fileWriter.write("\n");
     }
 
-    public static void createFeatureFile(String modelName, Field[] fields, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public static void createFeatureFile(String modelName, String[] modelConstraints, Field[] fields, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         // create directory if it does not exist
         File directory = new File("src/test/resources");
         directory.mkdir();
@@ -330,9 +466,10 @@ public class TestCaseGenerator {
         File featureFile = new File(directory, modelName + ".feature");
         featureFile.createNewFile();
 
+        String modelNameLowerCase = modelName.toLowerCase();
+
         FileWriter fileWriter = new FileWriter(featureFile);
         fileWriter.write("Feature: " + modelName + "\n\n");
-        String modelNameLowerCase = modelName.toLowerCase();
 
         String idFieldName = findIdFieldName(fields);
         int notNullableCount = 0;
@@ -347,25 +484,25 @@ public class TestCaseGenerator {
         }
 
         // create background
-        writeBackgroundForRelationalFields(fileWriter, relationalFields);
+        writeBackgroundForRelationalFields(fileWriter, modelConstraints, relationalFields);
 
         // create scenario
-        writeTestScenarioCreateSingleModel(fileWriter, fields, modelNameLowerCase, notNullableCount);
+        writeTestScenarioCreateSingleModel(fileWriter, modelConstraints, fields, idFieldName, modelNameLowerCase, notNullableCount);
 
         // create scenario
-        writeTestScenarioCreateMultipleModel(fileWriter, fields, modelNameLowerCase, notNullableCount, uniqueCount);
+        writeTestScenarioCreateMultipleModel(fileWriter, modelConstraints, fields, idFieldName, modelNameLowerCase, notNullableCount, uniqueCount);
 
         // create scenario
         writeTestScenarioFetchOrDeleteBeforeModelCreation("fetch", "fetching", idFieldName, fileWriter, modelNameLowerCase);
 
         // create scenario
-        writeTestScenarioFetchOrDeleteAfterModelCreation("fetch", "fetching", idFieldName, fileWriter, fields, modelNameLowerCase);
+        writeTestScenarioFetchOrDeleteAfterModelCreation("fetch", "fetching", idFieldName, fileWriter, modelConstraints, fields, modelNameLowerCase);
 
         // create scenario
         writeTestScenarioFetchOrDeleteBeforeModelCreation("delete", "deleting", idFieldName, fileWriter, modelNameLowerCase);
 
         // create scenario
-        writeTestScenarioFetchOrDeleteAfterModelCreation("delete", "deleting", idFieldName, fileWriter, fields, modelNameLowerCase);
+        writeTestScenarioFetchOrDeleteAfterModelCreation("delete", "deleting", idFieldName, fileWriter, modelConstraints, fields, modelNameLowerCase);
 
         fileWriter.flush();
         fileWriter.close();
@@ -384,10 +521,10 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeStepDefinitionMethodCreateModelWithValues(FileWriter fileWriter, Field[] fields, Method[] methods, String repositoryObjectName, String modelName, String modelNameLowerCase, File[] repositoriesList) throws IOException {
+    private static void writeStepDefinitionMethodCreateModelWithValues(FileWriter fileWriter, String[] modelConstraints, Field[] fields, Method[] methods, String repositoryObjectName, String modelName, String modelNameLowerCase, File[] repositoriesList) throws IOException {
         fileWriter.write("  @Given(\"create "+modelNameLowerCase+" with values");
         for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer") || isCustomModelField(field)) {
+            if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) != null || isCustomModelField(field)) {
                 fileWriter.write(" {int}");
             }
             else if(field.getType().toString().endsWith("String")) {
@@ -397,18 +534,22 @@ public class TestCaseGenerator {
         fileWriter.write("\")\n");
         fileWriter.write("  public void set"+modelName+"Properties(");
         for(int i=0; i<fields.length; i++) {
-            if(fields[i].getType().toString().endsWith("Integer")) {
-                fileWriter.write("int " + fields[i].getName());
+            if(fields[i].getType().toString().endsWith("Integer") || fields[i].getType().toString().equals("int")) {
+                fileWriter.write((i==0?"":", ") + "int " + fields[i].getName());
             }
             else if(fields[i].getType().toString().endsWith("String")) {
-                fileWriter.write("String " + fields[i].getName());
+                fileWriter.write((i==0?"":", ") + "String " + fields[i].getName());
             }
             else if(isCustomModelField(fields[i]))
-                fileWriter.write("int " + fields[i].getName()+"_id");
-            if(i!=fields.length-1)
-                fileWriter.write(", ");
+                fileWriter.write((i==0?"":", ") + "int " + fields[i].getName()+"_id");
+            else if(getParameterNameForMultiFieldConstraints(modelConstraints, fields[i], fields) != null)
+                fileWriter.write((i==0?"":", ") + "int " + getParameterNameForMultiFieldConstraints(modelConstraints, fields[i], fields));
         }
         fileWriter.write(") {\n");
+        for(Field field: fields){
+            if(getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) != null)
+                fileWriter.write("      current"+modelName+" = new "+modelName+"("+getParameterNameForMultiFieldConstraints(modelConstraints, field, fields)+");\n");
+        }
         for(Field field: fields) {
             for(Method method: methods) {
                 if(method.getName().toLowerCase().contains("set"+field.getName())) {
@@ -418,7 +559,7 @@ public class TestCaseGenerator {
                         fileWriter.write("      if(" + field.getName()+"_id != -1) \n");
                         fileWriter.write("          current"+modelName+"."+method.getName()+"("+getClassObjectName(findModelRepository(getModelNameFromType(field.getType().toString()), repositoriesList))+".findById("+field.getName()+"_id).get());\n");
                     }
-                    else
+                    else if(getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) == null)
                         fileWriter.write("      current"+modelName+"."+method.getName()+"("+field.getName()+");\n");
                 }
             }
@@ -470,33 +611,50 @@ public class TestCaseGenerator {
 
     private static void writeMethodAssertRemainingEntries(FileWriter fileWriter) throws IOException {
         fileWriter.write("  private void assertRemainingEntries(Iterable expectedEntriesIterable, Iterable actualEntriesIterable, String[] foreignKeys) {\n");
-        fileWriter.write("      ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);\n");
-        fileWriter.write("      actualEntriesList.remove(actualEntriesList.size() - 1);\n");
-        fileWriter.write("      Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();\n");
         fileWriter.write("      Object[] expectedEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();\n");
-        fileWriter.write("      assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);\n");
-        fileWriter.write("      for(int i = 0; i < expectedEntries.length; i++)\n");
-        fileWriter.write("          assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));\n");
+        fileWriter.write("      Object[] actualEntries = new ArrayList((Collection) expectedEntriesIterable).toArray();\n");
+        fileWriter.write("      if(expectedEntries.length == actualEntries.length) \n");
+        fileWriter.write("          for(int i = 0; i < expectedEntries.length; i++) \n");
+        fileWriter.write("              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntries[i]));\n");
+        fileWriter.write("      else {\n");
+        fileWriter.write("          ArrayList actualEntriesList = new ArrayList((Collection) actualEntriesIterable);\n");
+        fileWriter.write("          actualEntriesList.remove(actualEntriesList.size() - 1);\n");
+        fileWriter.write("          Object[] actualEntriesWithoutLatest = actualEntriesList.toArray();\n");
+        fileWriter.write("          assertEquals(expectedEntries.length, actualEntriesWithoutLatest.length);\n");
+        fileWriter.write("          for(int i = 0; i < expectedEntries.length; i++)\n");
+        fileWriter.write("              assertTrue(new ReflectionEquals(expectedEntries[i], foreignKeys).matches(actualEntriesWithoutLatest[i]));\n");
+        fileWriter.write("      }\n");
         fileWriter.write("  }\n\n");
     }
 
-    private static void writeMethodAssertModelObjectEquals(FileWriter fileWriter, String modelName, String modelNameLowerCase, ArrayList<Field> relationalFields) throws IOException {
+    private static void writeMethodAssertModelObjectEquals(FileWriter fileWriter, String modelName, String modelNameLowerCase, Field[] fields, Method[] methods, ArrayList<Field> relationalFields) throws IOException {
         fileWriter.write("  private void assert"+modelName+"ObjectEquals("+modelName+" "+modelNameLowerCase+") {\n");
         fileWriter.write("      assertTrue(new ReflectionEquals("+modelNameLowerCase);
-        if(!relationalFields.isEmpty()) {
+        ArrayList<Field> relationalFieldsAndDate = new ArrayList<>(relationalFields);
+        for(Field field: fields)
+            if(field.getType().toString().endsWith("Date"))
+                relationalFieldsAndDate.add(field);
+        if(!relationalFieldsAndDate.isEmpty()) {
             fileWriter.write(", new String[]{");
-            for(int i=0; i<relationalFields.size(); i++) {
+            for(int i=0; i<relationalFieldsAndDate.size(); i++) {
                 if(i==0)
-                    fileWriter.write("\""+relationalFields.get(i).getName()+"\"");
+                    fileWriter.write("\""+relationalFieldsAndDate.get(i).getName()+"\"");
                 else
-                    fileWriter.write(", \""+relationalFields.get(i).getName()+"\"");
+                    fileWriter.write(", \""+relationalFieldsAndDate.get(i).getName()+"\"");
             }
             fileWriter.write("}");
         }
         fileWriter.write(").matches(current"+modelName+"));\n");
-        if(!relationalFields.isEmpty()) {
-            for(Field relationalField: relationalFields) {
-                fileWriter.write("      assertTrue(new ReflectionEquals("+modelNameLowerCase+".get"+getModelNameFromType(relationalField.getType().toString())+"().getId()).matches(current"+modelName+".get"+getModelNameFromType(relationalField.getType().toString())+"().getId()));\n");
+        if(!relationalFieldsAndDate.isEmpty()) {
+            for(Field relationalFieldAndDate: relationalFieldsAndDate) {
+                if(relationalFieldAndDate.getType().toString().endsWith("Date")) {
+                    for(Method method: methods) {
+                        if(method.getName().toLowerCase().contains("get"+relationalFieldAndDate.getName()))
+                            fileWriter.write("      assertTrue(new ReflectionEquals(" + modelNameLowerCase + "." + method.getName() + "()).matches(current" + modelName + "." + method.getName() + "()));\n");
+                    }
+                }
+                else
+                    fileWriter.write("      assertTrue(new ReflectionEquals("+modelNameLowerCase+".get"+getModelNameFromType(relationalFieldAndDate.getType().toString())+"().getId()).matches(current"+modelName+".get"+getModelNameFromType(relationalFieldAndDate.getType().toString())+"().getId()));\n");
             }
         }
         fileWriter.write("  }\n\n");
@@ -618,7 +776,7 @@ public class TestCaseGenerator {
         fileWriter.write("  }\n\n");
     }
 
-    public static void createStepDefinitionsFile(String classPath, String modelName, String modelRepositoryName, Field[] fields, ArrayList<Field> relationalFields, Method[] methods, File[] modelsList, File[] repositoriesList) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public static void createStepDefinitionsFile(String classPath, String modelName, String[] modelConstraints, String modelRepositoryName, Field[] fields, ArrayList<Field> relationalFields, Method[] methods, File[] modelsList, File[] repositoriesList) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         String commonClassPath  = classPath.replace("."+MODEL_PACKAGE_NAME+"."+modelName, "");
         String packageName = "cucumber";
 
@@ -662,7 +820,7 @@ public class TestCaseGenerator {
             writeStepDefinitionMethodDeleteExisting(fileWriter, modelName, modelNameLowerCase, repositoryObjectName);
 
             // creating method
-            writeStepDefinitionMethodCreateModelWithValues(fileWriter, fields, methods, repositoryObjectName, modelName, modelNameLowerCase, repositoriesList);
+            writeStepDefinitionMethodCreateModelWithValues(fileWriter, modelConstraints, fields, methods, repositoryObjectName, modelName, modelNameLowerCase, repositoriesList);
 
             // creating method
             writeMethodGetModelById(fileWriter, modelName, repositoryObjectName);
@@ -677,7 +835,7 @@ public class TestCaseGenerator {
             writeMethodAssertRemainingEntries(fileWriter);
 
             // creating method
-            writeMethodAssertModelObjectEquals(fileWriter, modelName, modelNameLowerCase, relationalFields);
+            writeMethodAssertModelObjectEquals(fileWriter, modelName, modelNameLowerCase, fields, methods, relationalFields);
 
             // creating method
             writeMethodAssertOtherEntitiesUnchanged(fileWriter, modelsList, repositoriesList, modelName);

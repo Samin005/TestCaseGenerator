@@ -33,11 +33,11 @@ public class Loan {
 
     public Loan() {
         int daysToDue = 20;
-        this.due = initializeDueDate(daysToDue);
+        setDue(initializeDueDate(daysToDue));
     }
 
     public Loan(int daysToDue) {
-        this.due = initializeDueDate(daysToDue);
+        setDue(initializeDueDate(daysToDue));
     }
 
     private Date initializeDueDate(int daysToDue) {

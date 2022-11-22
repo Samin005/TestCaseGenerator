@@ -278,7 +278,7 @@ public class TestCaseGenerator {
                         else if(Arrays.toString(modelConstraints).contains(fields[k].getName()) && getFieldValueFromModelConstraints(modelConstraints, fields[k]) != 0) {
                             if(j==1 && !previousValueSet && lastUpdatedIndex != k){ // n-1
                                 fileWriter.write("| " + (getFieldValueFromModelConstraints(modelConstraints, fields[k])-1) + " ");
-                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].equals("<="))
+                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].contains("<"))
                                     status = "valid";
                                 else
                                     status = "invalid";
@@ -286,7 +286,7 @@ public class TestCaseGenerator {
                             }
                             else if(j==2 && !afterValueSet && lastUpdatedIndex != k){ // n+1
                                 fileWriter.write("| " + (getFieldValueFromModelConstraints(modelConstraints, fields[k])+1) + " ");
-                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].equals("=>"))
+                                if(getModelConstraintDividedBasedOnField(modelConstraints, fields[k])[1].contains(">"))
                                     status = "valid";
                                 else
                                     status = "invalid";

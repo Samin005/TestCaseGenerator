@@ -10,6 +10,9 @@ import com.example.testcasegenerator.repository.*;
 
 public class TitleStepDefinitions {
   @Autowired
+  private AuthorRepository authorRepository;
+  private Iterable<Author> authorSnapshot;
+  @Autowired
   private ItemRepository itemRepository;
   private Iterable<Item> itemSnapshot;
   @Autowired
@@ -30,11 +33,15 @@ public class TitleStepDefinitions {
       System.out.println("Deleted all titles");
   }
 
-  @Given("create title with values {int} {string}")
-  public void setTitleProperties(int id, String isbn) {
+  @Given("create title with values {int} {string} {string} {int}")
+  public void setTitleProperties(int id, String isbn, String name, int author_id) {
       currentTitle.setId(id);
       isbn = isbn.equals("null") ? null : isbn;
       currentTitle.setIsbn(isbn);
+      name = name.equals("null") ? null : name;
+      currentTitle.setName(name);
+      if(author_id != -1) 
+          currentTitle.setAuthor(authorRepository.findById(author_id).get());
       try{
           titleRepository.save(currentTitle);
           System.out.println("Saved title with id: " + currentTitle.getId());
@@ -51,6 +58,7 @@ public class TitleStepDefinitions {
 
   @Given("save database snapshot for titles and rest of the world")
   public void saveDatabaseSnapshot() {
+      authorSnapshot = authorRepository.findAll();
       itemSnapshot = itemRepository.findAll();
       loanSnapshot = loanRepository.findAll();
       titleSnapshot = titleRepository.findAll();
@@ -82,10 +90,12 @@ public class TitleStepDefinitions {
   }
 
   private void assertTitleObjectEquals(Title title) {
-      assertTrue(new ReflectionEquals(title).matches(currentTitle));
+      assertTrue(new ReflectionEquals(title, new String[]{"author"}).matches(currentTitle));
+      assertTrue(new ReflectionEquals(title.getAuthor().getId()).matches(currentTitle.getAuthor().getId()));
   }
 
   private void assertOtherEntitiesUnchanged() {
+      assertEntityEquals(authorSnapshot, authorRepository.findAll(), null);
       assertEntityEquals(itemSnapshot, itemRepository.findAll(), new String[]{"title"});
       assertEntityEquals(loanSnapshot, loanRepository.findAll(), new String[]{"user", "item"});
       assertEntityEquals(userSnapshot, userRepository.findAll(), null);
@@ -93,13 +103,13 @@ public class TitleStepDefinitions {
 
   private void assertCreationStatusWithSnapshotValidation(Title createdTitle) {
       assertTitleObjectEquals(createdTitle);
-      assertRemainingEntries(titleSnapshot, titleRepository.findAll(), null);
+      assertRemainingEntries(titleSnapshot, titleRepository.findAll(), new String[]{"author"});
 
       assertOtherEntitiesUnchanged();
   }
 
   private void assertSnapshotUnchanged() {
-      assertEntityEquals(titleSnapshot, titleRepository.findAll(), null);
+      assertEntityEquals(titleSnapshot, titleRepository.findAll(), new String[]{"author"});
       assertOtherEntitiesUnchanged();
   }
 
@@ -137,7 +147,7 @@ public class TitleStepDefinitions {
   }
 
   private void assertDeletionStatusWithSnapshotValidation() {
-      assertRemainingEntries(titleRepository.findAll(), titleSnapshot, null);
+      assertRemainingEntries(titleRepository.findAll(), titleSnapshot, new String[]{"author"});
 
       assertOtherEntitiesUnchanged();
   }

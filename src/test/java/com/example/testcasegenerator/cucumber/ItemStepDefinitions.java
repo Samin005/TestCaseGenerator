@@ -10,6 +10,9 @@ import com.example.testcasegenerator.repository.*;
 
 public class ItemStepDefinitions {
   @Autowired
+  private AuthorRepository authorRepository;
+  private Iterable<Author> authorSnapshot;
+  @Autowired
   private ItemRepository itemRepository;
   private Iterable<Item> itemSnapshot;
   @Autowired
@@ -30,11 +33,13 @@ public class ItemStepDefinitions {
       System.out.println("Deleted all items");
   }
 
-  @Given("create item with values {int} {int}")
-  public void setItemProperties(int id, int title_id) {
+  @Given("create item with values {int} {int} {string}")
+  public void setItemProperties(int id, int title_id, String location) {
       currentItem.setId(id);
       if(title_id != -1) 
           currentItem.setTitle(titleRepository.findById(title_id).get());
+      location = location.equals("null") ? null : location;
+      currentItem.setLocation(location);
       try{
           itemRepository.save(currentItem);
           System.out.println("Saved item with id: " + currentItem.getId());
@@ -51,6 +56,7 @@ public class ItemStepDefinitions {
 
   @Given("save database snapshot for items and rest of the world")
   public void saveDatabaseSnapshot() {
+      authorSnapshot = authorRepository.findAll();
       itemSnapshot = itemRepository.findAll();
       loanSnapshot = loanRepository.findAll();
       titleSnapshot = titleRepository.findAll();
@@ -82,13 +88,15 @@ public class ItemStepDefinitions {
   }
 
   private void assertItemObjectEquals(Item item) {
-      assertTrue(new ReflectionEquals(item, new String[]{"title"}).matches(currentItem));
+      assertTrue(new ReflectionEquals(item, new String[]{"title", "created"}).matches(currentItem));
       assertTrue(new ReflectionEquals(item.getTitle().getId()).matches(currentItem.getTitle().getId()));
+      assertTrue(new ReflectionEquals(item.getCreated()).matches(currentItem.getCreated()));
   }
 
   private void assertOtherEntitiesUnchanged() {
+      assertEntityEquals(authorSnapshot, authorRepository.findAll(), null);
       assertEntityEquals(loanSnapshot, loanRepository.findAll(), new String[]{"user", "item"});
-      assertEntityEquals(titleSnapshot, titleRepository.findAll(), null);
+      assertEntityEquals(titleSnapshot, titleRepository.findAll(), new String[]{"author"});
       assertEntityEquals(userSnapshot, userRepository.findAll(), null);
   }
 

@@ -26,7 +26,7 @@ public class Loan {
 
     @Temporal(TemporalType.DATE)
     @Column(updatable = false)
-    private final Date created =  new Date();
+    private final Date created = new Date();
 
     @Temporal(TemporalType.DATE)
     private Date due;

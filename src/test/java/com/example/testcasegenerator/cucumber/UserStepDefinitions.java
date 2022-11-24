@@ -10,6 +10,9 @@ import com.example.testcasegenerator.repository.*;
 
 public class UserStepDefinitions {
   @Autowired
+  private AuthorRepository authorRepository;
+  private Iterable<Author> authorSnapshot;
+  @Autowired
   private ItemRepository itemRepository;
   private Iterable<Item> itemSnapshot;
   @Autowired
@@ -53,6 +56,7 @@ public class UserStepDefinitions {
 
   @Given("save database snapshot for users and rest of the world")
   public void saveDatabaseSnapshot() {
+      authorSnapshot = authorRepository.findAll();
       itemSnapshot = itemRepository.findAll();
       loanSnapshot = loanRepository.findAll();
       titleSnapshot = titleRepository.findAll();
@@ -88,9 +92,10 @@ public class UserStepDefinitions {
   }
 
   private void assertOtherEntitiesUnchanged() {
+      assertEntityEquals(authorSnapshot, authorRepository.findAll(), null);
       assertEntityEquals(itemSnapshot, itemRepository.findAll(), new String[]{"title"});
       assertEntityEquals(loanSnapshot, loanRepository.findAll(), new String[]{"user", "item"});
-      assertEntityEquals(titleSnapshot, titleRepository.findAll(), null);
+      assertEntityEquals(titleSnapshot, titleRepository.findAll(), new String[]{"author"});
   }
 
   private void assertCreationStatusWithSnapshotValidation(User createdUser) {

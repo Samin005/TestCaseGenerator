@@ -308,16 +308,27 @@ public class TestCaseGenerator {
         }
     }
 
+    private static void writeRecursiveRelationalModelCreation(FileWriter fileWriter, String[] modelConstraints, String modelNameLowerCase, Field[] modelFields) throws ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, IOException {
+        ArrayList<Field> relationalFields = getRelationalFields(modelFields);
+        if(relationalFields.size() > 0) {
+            for(Field relationalField : relationalFields) {
+                String relationalModelClasspath = relationalField.getType().toString().replace("class ", "");
+                String[] relationalModelConstraints = getModelConstraintsFromModelAnnotations(getModelAnnotationsFromModelClassPath(relationalModelClasspath));
+                String relationalModelNameLowerCase = getModelNameFromType(relationalField.getType().toString()).toLowerCase();
+                Field[] relationalModelFields = getFieldsFromModelClassPath(relationalModelClasspath);
+                writeRecursiveRelationalModelCreation(fileWriter, relationalModelConstraints, relationalModelNameLowerCase, relationalModelFields);
+            }
+        }
+        writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, modelFields, modelNameLowerCase, "Given", "values");
+    }
+
     private static void writeBackgroundForRelationalFields(FileWriter fileWriter, String[] modelConstraints, ArrayList<Field> relationalFields) throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         if(relationalFields.size() > 0) {
             fileWriter.write("  Background: \n");
-            for(int i=0; i<relationalFields.size(); i++) {
-                String modelNameLowerCase = getModelNameFromType(relationalFields.get(i).getType().toString()).toLowerCase();
-                Field[] modelFields = getFieldsFromModelClassPath(relationalFields.get(i).getType().toString().replace("class ", ""));
-                String command = "Given";
-                if(i>0)
-                    command = "And";
-                writeStatementsForCreatingCurrentModelWithAllFields(fileWriter, modelConstraints, modelFields, modelNameLowerCase, command, "values");
+            for(Field relationalField : relationalFields) {
+                String modelNameLowerCase = getModelNameFromType(relationalField.getType().toString()).toLowerCase();
+                Field[] modelFields = getFieldsFromModelClassPath(relationalField.getType().toString().replace("class ", ""));
+                writeRecursiveRelationalModelCreation(fileWriter, modelConstraints, modelNameLowerCase, modelFields);
             }
             fileWriter.write("\n");
         }

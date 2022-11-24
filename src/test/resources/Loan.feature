@@ -2,7 +2,9 @@ Feature: Loan
 
   Background: 
       Given create user with values 1 "test-name" "test-email" 
-      And create item with values 1 1 
+      Given create author with values 1 "test-name" 
+      Given create title with values 1 "test-isbn" "test-name" 1 
+      Given create item with values 1 1 "test-location" 
 
   Scenario Outline: create single loan
       Given delete existing loans

@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+
 @RestController
 @RequestMapping(path = "/title")
+@CrossOrigin(origins = "${frontend.url}")
 public class TitleController {
     private final TitleRepository titleRepository;
 
@@ -35,21 +38,21 @@ public class TitleController {
         if(titleRepository.findById(titleId).isPresent()){
             return new ResponseEntity<>(titleRepository.save(updatedTitle), HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No title found with ID: " + titleId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No title found with ID: " + titleId);}}, HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/{titleId}")
     public ResponseEntity<Object> deleteTitleById(@PathVariable int titleId) {
         if(titleRepository.findById(titleId).isPresent()){
             titleRepository.deleteById(titleId);
-            return new ResponseEntity<>("Successfully deleted title", HttpStatus.OK);
+            return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted title");}}, HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No title found with ID: " + titleId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No title found with ID: " + titleId);}}, HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/deleteAll")
     public ResponseEntity<Object> deleteAllUsers() {
         titleRepository.deleteAll();
-        return new ResponseEntity<>("Successfully deleted all titles", HttpStatus.OK);
+        return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted all titles");}}, HttpStatus.OK);
     }
 }

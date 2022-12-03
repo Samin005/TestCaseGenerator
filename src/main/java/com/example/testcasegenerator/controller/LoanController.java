@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+
 @RestController
 @RequestMapping(path = "/loan")
+@CrossOrigin(origins = "${frontend.url}")
 public class LoanController {
     private final LoanRepository loanRepository;
 
@@ -35,21 +38,21 @@ public class LoanController {
         if(loanRepository.findById(loanId).isPresent()){
             return new ResponseEntity<>(loanRepository.save(updatedLoan), HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No loan found with ID: " + loanId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No loan found with ID: " + loanId);}}, HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/{loanId}")
     public ResponseEntity<Object> deleteLoanById(@PathVariable int loanId) {
         if(loanRepository.findById(loanId).isPresent()){
             loanRepository.deleteById(loanId);
-            return new ResponseEntity<>("Successfully deleted loan", HttpStatus.OK);
+            return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted loan");}}, HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No loan found with ID: " + loanId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No loan found with ID: " + loanId);}}, HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/deleteAll")
     public ResponseEntity<Object> deleteAllUsers() {
         loanRepository.deleteAll();
-        return new ResponseEntity<>("Successfully deleted all loans", HttpStatus.OK);
+        return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted all loans");}}, HttpStatus.OK);
     }
 }

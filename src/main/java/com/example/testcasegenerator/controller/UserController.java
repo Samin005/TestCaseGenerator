@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+
 @RestController
 @RequestMapping(path="/user")
+@CrossOrigin(origins = "${frontend.url}")
 public class UserController {
     private final UserRepository userRepository;
 
@@ -24,7 +27,7 @@ public class UserController {
     public ResponseEntity<Object> getUserById(@PathVariable int userId) {
         if(userRepository.findById(userId).isPresent())
             return new ResponseEntity<>(userRepository.findById(userId).get(), HttpStatus.OK);
-        else return new ResponseEntity<>("No user found with ID: " + userId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No user found with ID: " + userId);}}, HttpStatus.NOT_FOUND);
     }
 
     @PostMapping
@@ -40,22 +43,22 @@ public class UserController {
             if(updatedUser.getEmail()!=null) userToUpdate.setEmail(updatedUser.getEmail());
             return new ResponseEntity<>(userRepository.save(userToUpdate), HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No user found with ID: " + userId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No user found with ID: " + userId);}}, HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/{userId}")
     public ResponseEntity<Object> deleteUserById(@PathVariable int userId) {
         if(userRepository.findById(userId).isPresent()){
             userRepository.deleteById(userId);
-            return new ResponseEntity<>("Successfully deleted user", HttpStatus.OK);
+            return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted user");}}, HttpStatus.OK);
         }
-        else return new ResponseEntity<>("No user found with ID: " + userId, HttpStatus.NOT_FOUND);
+        else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No user found with ID: "+ userId);}} , HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/deleteAll")
     public ResponseEntity<Object> deleteAllUsers() {
         userRepository.deleteAll();
-        return new ResponseEntity<>("Successfully deleted all users", HttpStatus.OK);
+        return new ResponseEntity<>(new HashMap<String, String>(1){{put("result", "Successfully deleted all users");}}, HttpStatus.OK);
     }
 
 }

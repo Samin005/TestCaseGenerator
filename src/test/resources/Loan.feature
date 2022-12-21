@@ -18,7 +18,7 @@ Feature: Loan
          | 1 | 1 | -1 | 1 | 20 | invalid |
          | 1 | 1 | 1 | 1 | 20 | valid |
          | 1 | 1 | 1 | 3 | 20 | invalid |
-         | 1 | 1 | 1 | 2 | 19 | invalid |
+         | 1 | 1 | 1 | 2 | 19 | valid |
          | 1 | 1 | 1 | 2 | 21 | invalid |
          
   Scenario Outline: create multiple loans
@@ -33,7 +33,7 @@ Feature: Loan
          | 2 | 1 | -1 | 1 | 20 | invalid |
          | 2 | 1 | 1 | 1 | 20 | valid |
          | 2 | 1 | 1 | 3 | 20 | invalid |
-         | 2 | 1 | 1 | 2 | 19 | invalid |
+         | 2 | 1 | 1 | 2 | 19 | valid |
          | 2 | 1 | 1 | 2 | 21 | invalid |
          
   Scenario Outline: fetch loan without creation

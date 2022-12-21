@@ -36,6 +36,7 @@ public class TitleController {
     @RequestMapping(value = "/{titleId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<Object> updateTitle (@PathVariable int titleId, @RequestBody Title updatedTitle) {
         if(titleRepository.findById(titleId).isPresent()){
+            updatedTitle.setId(titleId);
             return new ResponseEntity<>(titleRepository.save(updatedTitle), HttpStatus.OK);
         }
         else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No title found with ID: " + titleId);}}, HttpStatus.NOT_FOUND);

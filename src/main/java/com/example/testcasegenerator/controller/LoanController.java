@@ -36,6 +36,7 @@ public class LoanController {
     @RequestMapping(value = "/{loanId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<Object> updateLoan (@PathVariable int loanId, @RequestBody Loan updatedLoan) {
         if(loanRepository.findById(loanId).isPresent()){
+            updatedLoan.setId(loanId);
             return new ResponseEntity<>(loanRepository.save(updatedLoan), HttpStatus.OK);
         }
         else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No loan found with ID: " + loanId);}}, HttpStatus.NOT_FOUND);

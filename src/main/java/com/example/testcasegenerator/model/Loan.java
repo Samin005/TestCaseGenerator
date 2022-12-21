@@ -9,7 +9,7 @@ import java.util.Calendar;
 import java.util.Date;
 
 @Entity
-@Check(constraints = "renewal <= 2 AND due = created + interval 20 day")
+@Check(constraints = "renewal <= 2 AND due <= created + interval 20 day")
 public class Loan {
     @Id
     private Integer id;

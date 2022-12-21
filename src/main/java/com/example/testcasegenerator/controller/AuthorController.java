@@ -36,6 +36,7 @@ public class AuthorController {
     @RequestMapping(value = "/{authorId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<Object> updateAuthor (@PathVariable int authorId, @RequestBody Author updatedAuthor) {
         if(authorRepository.findById(authorId).isPresent()){
+            updatedAuthor.setId(authorId);
             return new ResponseEntity<>(authorRepository.save(updatedAuthor), HttpStatus.OK);
         }
         else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No author found with ID: " + authorId);}}, HttpStatus.NOT_FOUND);

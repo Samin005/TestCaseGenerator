@@ -36,6 +36,7 @@ public class ItemController {
     @RequestMapping(value = "/{itemId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<Object> updateItem (@PathVariable int itemId, @RequestBody Item updatedItem) {
         if(itemRepository.findById(itemId).isPresent()){
+            updatedItem.setId(itemId);
             return new ResponseEntity<>(itemRepository.save(updatedItem), HttpStatus.OK);
         }
         else return new ResponseEntity<>(new HashMap<String, String>(1){{put("error", "No item found with ID: " + itemId);}}, HttpStatus.NOT_FOUND);

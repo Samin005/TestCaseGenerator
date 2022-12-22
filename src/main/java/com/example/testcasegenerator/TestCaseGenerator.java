@@ -1,10 +1,6 @@
 package com.example.testcasegenerator;
 
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -29,11 +25,16 @@ public class TestCaseGenerator {
             File repositoryFolder = findFile(System.getProperty("user.dir") + "/src", REPOSITORY_PACKAGE_NAME);
             File[] repositoriesList = repositoryFolder.listFiles();
 
+            boolean cucumberSpringConfigurationCreated = false;
             for (File modelFile : modelsList) {
                 if(modelFile.isFile() && modelFile.getName().endsWith(".java")) {
                     String modelName = modelFile.getName().replace(".java", "");
                     System.out.println("Model name: " + modelName);
                     String classPath = getClasspathFromModelFile(modelFile);
+                    if(!cucumberSpringConfigurationCreated) {
+                        createCucumberSpringConfigurationFile(classPath, modelName);
+                        cucumberSpringConfigurationCreated = true;
+                    }
                     Annotation[] modelAnnotations = getModelAnnotationsFromModelClassPath(classPath);
                     String[] modelConstraints = getModelConstraintsFromModelAnnotations(modelAnnotations);
                     System.out.println("Model Constraints: "+modelConstraints.length+ Arrays.toString(modelConstraints)+"\n");
@@ -73,6 +74,48 @@ public class TestCaseGenerator {
 
     private static String getClasspathFromModelFile(File modelFile) {
         return modelFile.getAbsolutePath().replace("\\", "/").replace(":/", ":\\\\").replace(System.getProperty("user.dir").replace("\\", "/").replace(":/", ":\\\\") + "/src/main/java/", "").replace(".java", "").replaceAll("/", ".");
+    }
+
+    public static void createCucumberSpringConfigurationFile(String classPath, String modelName) throws IOException {
+        String commonClassPath  = classPath.replace("."+MODEL_PACKAGE_NAME+"."+modelName, "");
+        String packageName = "cucumber";
+        String applicationFileName = getFileNameEndsWith(System.getProperty("user.dir") + "\\src\\main\\java\\" + commonClassPath.replaceAll("\\.", "\\\\"), "Application.java");
+
+        if(applicationFileName != null) {
+            // create directory if it does not exist
+            File directory = new File("src/test/java/"+commonClassPath.replaceAll("\\.", "/")+"/"+packageName);
+            directory.mkdir();
+
+            // create empty configuration file
+            File cucumberSpringConfigurationFile = new File(directory, "CucumberSpringConfiguration.java");
+            cucumberSpringConfigurationFile.createNewFile();
+
+            FileWriter fileWriter = new FileWriter(cucumberSpringConfigurationFile);
+            // adding required imports
+            fileWriter.write("package " + commonClassPath + "." + packageName + ";\n\n");
+            fileWriter.write("import org.springframework.boot.test.context.SpringBootTest;\n");
+            fileWriter.write("import io.cucumber.spring.CucumberContextConfiguration;\n");
+            fileWriter.write("import " + commonClassPath + "." + applicationFileName + ";\n\n");
+
+
+            fileWriter.write("@CucumberContextConfiguration\n");
+            fileWriter.write("@SpringBootTest(classes = " + applicationFileName + ".class)\n");
+            fileWriter.write("public class CucumberSpringConfiguration {\n");
+            fileWriter.write("}\n");
+
+            fileWriter.flush();
+            fileWriter.close();
+        }
+        else
+            System.out.println("Failed to locate Application.java file, could not create the CucumberSpringConfiguration.java file. \nProceeding with other tasks.");
+    }
+
+    private static String getFileNameEndsWith(String path, String fileEndsWith) {
+        File f = new File(path);
+        File[] matchingFiles = f.listFiles((dir, name) -> name.endsWith(fileEndsWith));
+        if(matchingFiles.length < 1)
+            return null;
+        return matchingFiles[0].getName().replace(".java", "");
     }
 
     private static Annotation[] getModelAnnotationsFromModelClassPath(String modelClassPath) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
@@ -845,11 +888,11 @@ public class TestCaseGenerator {
         File directory = new File("src/test/java/"+commonClassPath.replaceAll("\\.", "/")+"/"+packageName);
         directory.mkdir();
 
-        // create empty feature file
-        File featureFile = new File(directory, modelName + "StepDefinitions.java");
-        featureFile.createNewFile();
+        // create empty step definition file
+        File stepDefinitionFile = new File(directory, modelName + "StepDefinitions.java");
+        stepDefinitionFile.createNewFile();
 
-        FileWriter fileWriter = new FileWriter(featureFile);
+        FileWriter fileWriter = new FileWriter(stepDefinitionFile);
         // adding required imports
         fileWriter.write("package " + commonClassPath + "." + packageName + ";\n\n");
         fileWriter.write("import io.cucumber.java.en.*;\n");

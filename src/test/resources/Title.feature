@@ -13,7 +13,7 @@ Feature: Title
          | 1 | test1 | test1 | 1 | valid |
          | 1 | null | test0 | 1 | invalid |
          | 1 | test1 | null | 1 | invalid |
-         | 1 | null | test2 | 1 | invalid |
+         | 1 | test2 | test2 | -1 | invalid |
          
   Scenario Outline: create multiple titles
       Given save database snapshot for titles and rest of the world
@@ -26,7 +26,7 @@ Feature: Title
          | 2 | test1 | test2 | 1 | invalid |
          | 2 | null | test0 | 1 | invalid |
          | 2 | test1 | null | 1 | invalid |
-         | 2 | null | test2 | 1 | invalid |
+         | 2 | test2 | test2 | -1 | invalid |
          
   Scenario Outline: fetch title without creation
       Given delete existing titles

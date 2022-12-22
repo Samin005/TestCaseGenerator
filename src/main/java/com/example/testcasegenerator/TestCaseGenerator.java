@@ -18,6 +18,7 @@ public class TestCaseGenerator {
     static String REPOSITORY_PACKAGE_NAME = "repository";
 
     static int INT_DEFAULT_VALUE = 1;
+    static double DOUBLE_DEFAULT_VALUE = 1.00;
     static String STRING_DEFAULT_VALUE = "test";
 
     public static void main(String[] args) {
@@ -104,7 +105,16 @@ public class TestCaseGenerator {
     }
 
     private static boolean isRelationalField(Field field) {
-        return Arrays.toString(field.getAnnotations()).contains("OneToOne") | Arrays.toString(field.getAnnotations()).contains("ManyToOne") | Arrays.toString(field.getAnnotations()).contains("ManyToMany");
+        return Arrays.toString(field.getAnnotations()).contains("OneToOne") || Arrays.toString(field.getAnnotations()).contains("OneToMany") || Arrays.toString(field.getAnnotations()).contains("ManyToOne") || Arrays.toString(field.getAnnotations()).contains("ManyToMany");
+    }
+
+    private static boolean hasUniqueRelationalField(Field[] fields) {
+        boolean result = false;
+        for(Field field: fields) {
+            if(Arrays.toString(field.getAnnotations()).contains("OneToOne") || Arrays.toString(field.getAnnotations()).contains("OneToMany"))
+                result = true;
+        }
+        return result;
     }
 
     private static boolean isCustomModelField(Field field) {
@@ -209,7 +219,7 @@ public class TestCaseGenerator {
                     fileWriter.write("| " + idCounter + " ");
                 }
                 else if(fields[j].getType().toString().endsWith("String")) {
-                    if(Arrays.toString(fields[j].getAnnotations()).contains("nullable=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("nullable=false") && !nullAppliedForRow && j>lastNullAppliedIndex) {
                         fileWriter.write("| null ");
                         nullAppliedForRow = true;
                         lastNullAppliedIndex = j;
@@ -217,8 +227,18 @@ public class TestCaseGenerator {
                     else
                         fileWriter.write("| " + STRING_DEFAULT_VALUE + i + " ");
                 }
+                else if(fields[j].getType().toString().endsWith("double")) {
+                    // java defaults double to 0.0
+//                    if(Arrays.toString(fields[j].getAnnotations()).contains("nullable=false") && !nullAppliedForRow && j>lastNullAppliedIndex) {
+//                        fileWriter.write("| -1.00 ");
+//                        nullAppliedForRow = true;
+//                        lastNullAppliedIndex = j;
+//                    }
+//                    else
+                    fileWriter.write("| " + DOUBLE_DEFAULT_VALUE + " ");
+                }
                 else if(fields[j].getType().toString().endsWith("Integer") || fields[j].getType().toString().equals("int") || isCustomModelField(fields[j])) {
-                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && j>lastNullAppliedIndex) {
                         fileWriter.write("| -1 ");
                         nullAppliedForRow = true;
                         lastNullAppliedIndex = j;
@@ -227,7 +247,7 @@ public class TestCaseGenerator {
                         fileWriter.write("| " + INT_DEFAULT_VALUE + " ");
                 }
                 else if(getParameterNameForMultiFieldConstraints(modelConstraints, fields[j], fields) != null) {
-                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && lastNullAppliedIndex!=j) {
+                    if(Arrays.toString(fields[j].getAnnotations()).contains("optional=false") && !nullAppliedForRow && j>lastNullAppliedIndex) {
                         fileWriter.write("| -1 ");
                         nullAppliedForRow = true;
                         lastNullAppliedIndex = j;
@@ -252,11 +272,17 @@ public class TestCaseGenerator {
                     else
                         fileWriter.write("| "+STRING_DEFAULT_VALUE+idCounter+" ");
                 }
+                else if(field.getType().toString().endsWith("double")) {
+                    if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
+                        fileWriter.write("| "+(idCounter-1)/1.00+" ");
+                    else
+                        fileWriter.write("| "+idCounter/1.00+" ");
+                }
                 else if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || isCustomModelField(field)) {
-                    if(Arrays.toString(field.getAnnotations()).contains("unique=true") || Arrays.toString(field.getAnnotations()).contains("optional=false"))
+                    if(Arrays.toString(field.getAnnotations()).contains("unique=true") || Arrays.toString(field.getAnnotations()).contains("OneToOne") || Arrays.toString(field.getAnnotations()).contains("OneToMany"))
                         fileWriter.write("| "+(idCounter-1)+" ");
                     else
-                        fileWriter.write("| "+idCounter+" ");
+                        fileWriter.write("| "+INT_DEFAULT_VALUE+" ");
                 }
             }
             fileWriter.write("| invalid |\n         ");
@@ -342,6 +368,11 @@ public class TestCaseGenerator {
                     fileWriter.write("<" + field.getName() + "> ");
                 else fileWriter.write(INT_DEFAULT_VALUE+" ");
             }
+            else if(field.getType().toString().endsWith("double")) {
+                if(format.equals("example table"))
+                    fileWriter.write("<" + field.getName() + "> ");
+                else fileWriter.write(DOUBLE_DEFAULT_VALUE+" ");
+            }
             else if(field.getType().toString().endsWith("String")) {
                 if(format.equals("example table"))
                     fileWriter.write("\"<" + field.getName() + ">\" ");
@@ -372,7 +403,13 @@ public class TestCaseGenerator {
                 else if(field.getType().toString().endsWith("String")) {
                     fileWriter.write("| "+STRING_DEFAULT_VALUE+i+" ");
                 }
+                else if(field.getType().toString().endsWith("double")) {
+                    fileWriter.write("| "+ DOUBLE_DEFAULT_VALUE +" ");
+                }
                 else if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || isCustomModelField(field))
+//                    if(Arrays.toString(field.getAnnotations()).contains("unique=true") || Arrays.toString(field.getAnnotations()).contains("OneToOne") || Arrays.toString(field.getAnnotations()).contains("OneToMany"))
+//                        fileWriter.write("| " + i + " ");
+//                    else
                     fileWriter.write("| " + INT_DEFAULT_VALUE + " ");
             }
             fileWriter.write("| valid |\n         ");
@@ -381,7 +418,7 @@ public class TestCaseGenerator {
 
     private static void writeExampleTableHeaderForCreation(FileWriter fileWriter, Field[] fields, String[] modelConstraints) throws IOException {
         for(Field field: fields) {
-            if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || field.getType().toString().endsWith("String")) {
+            if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || field.getType().toString().endsWith("String") || field.getType().toString().endsWith("double")) {
                 fileWriter.write("| " + field.getName() + " ");
             }
             else if(isCustomModelField(field))
@@ -426,7 +463,7 @@ public class TestCaseGenerator {
         writeExampleTableHeaderForCreation(fileWriter, fields, modelConstraints);
 
         // valid case
-        writeValidExampleRowsWithAllFields(fileWriter, modelConstraints, fields, idFieldName, 2);
+        writeValidExampleRowsWithAllFields(fileWriter, modelConstraints, fields, idFieldName, hasUniqueRelationalField(fields) ? 1 : 2);
 
         // invalid unique cases
         writeUniqueInvalidCases(fileWriter, fields, idFieldName, 2, uniqueCount);
@@ -487,9 +524,10 @@ public class TestCaseGenerator {
         int uniqueCount = 0;
         for(Field field: fields) {
             if(!Arrays.toString(field.getAnnotations()).contains("Id()")) {
-                if(Arrays.toString(field.getAnnotations()).contains("nullable=false") || (isRelationalField(field) && Arrays.toString(field.getAnnotations()).contains("optional=false")))
+                // java defaults double to 0.0
+                if((Arrays.toString(field.getAnnotations()).contains("nullable=false") || (isRelationalField(field) && Arrays.toString(field.getAnnotations()).contains("optional=false"))) && !field.getType().toString().endsWith("double"))
                     notNullableCount++;
-                if(Arrays.toString(field.getAnnotations()).contains("unique=true"))
+                if(Arrays.toString(field.getAnnotations()).contains("unique=true") || Arrays.toString(field.getAnnotations()).contains("OneToOne") || Arrays.toString(field.getAnnotations()).contains("OneToMany"))
                     uniqueCount++;
             }
         }
@@ -538,6 +576,9 @@ public class TestCaseGenerator {
             if(field.getType().toString().endsWith("Integer") || field.getType().toString().equals("int") || getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) != null || isCustomModelField(field)) {
                 fileWriter.write(" {int}");
             }
+            else if(field.getType().toString().endsWith("double")) {
+                fileWriter.write(" {double}");
+            }
             else if(field.getType().toString().endsWith("String")) {
                 fileWriter.write(" {string}");
             }
@@ -547,6 +588,9 @@ public class TestCaseGenerator {
         for(int i=0; i<fields.length; i++) {
             if(fields[i].getType().toString().endsWith("Integer") || fields[i].getType().toString().equals("int")) {
                 fileWriter.write((i==0?"":", ") + "int " + fields[i].getName());
+            }
+            else if(fields[i].getType().toString().endsWith("double")) {
+                fileWriter.write((i==0?"":", ") + "double " + fields[i].getName());
             }
             else if(fields[i].getType().toString().endsWith("String")) {
                 fileWriter.write((i==0?"":", ") + "String " + fields[i].getName());
@@ -563,13 +607,19 @@ public class TestCaseGenerator {
         }
         for(Field field: fields) {
             for(Method method: methods) {
-                if(method.getName().toLowerCase().contains("set"+field.getName())) {
+                if(method.getName().toLowerCase().contains("set"+field.getName().toLowerCase())) {
                     if(field.getType().toString().endsWith("String"))
                         fileWriter.write("      "+field.getName()+" = "+field.getName()+".equals(\"null\") ? null : "+field.getName()+";\n");
+
                     if(isCustomModelField(field)){
                         fileWriter.write("      if(" + field.getName()+"_id != -1) \n");
                         fileWriter.write("          current"+modelName+"."+method.getName()+"("+getClassObjectName(findModelRepository(getModelNameFromType(field.getType().toString()), repositoriesList))+".findById("+field.getName()+"_id).get());\n");
                     }
+                    // java defaults double to 0.0
+//                    else if(field.getType().toString().endsWith("double")){
+//                        fileWriter.write("      if(" + field.getName()+" != -1.00) \n");
+//                        fileWriter.write("          current"+modelName+"."+method.getName()+"("+field.getName()+");\n");
+//                    }
                     else if(getParameterNameForMultiFieldConstraints(modelConstraints, field, fields) == null)
                         fileWriter.write("      current"+modelName+"."+method.getName()+"("+field.getName()+");\n");
                 }
